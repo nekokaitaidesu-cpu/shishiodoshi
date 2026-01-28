@@ -3,8 +3,8 @@ import streamlit as st
 # ページ設定
 st.set_page_config(page_title="スーパーししおどしCustom", page_icon="🎋", layout="centered")
 
-st.title("🎋 スーパーししおどしじぇみにっちスペシャル ver.2.0")
-st.write("ついに「全部入り」だっち！チェックボックスで要素を召喚するっち🍄")
+st.title("🎋 スーパーししおどしじぇみにっちスペシャル ver.2.1")
+st.write("コード漏れ修正版だっち！今度こそぬるぬる動くはずだっち🍄")
 
 # --- サイドバー設定 ---
 st.sidebar.header("⚙️ カスタム設定")
@@ -19,10 +19,10 @@ show_splash = st.sidebar.checkbox("水しぶき（バシャーン！）", value=
 show_grass = st.sidebar.checkbox("背景の草（わさわさ）", value=True)
 show_mushroom = st.sidebar.checkbox("謎の光るキノコ（！？）", value=True)
 
-# --- CSS 生成ロジック ---
+# --- CSS 生成ロジック（変数を先に作る） ---
 
-# 竹の質感切り替え
-bamboo_bg = """
+# 竹の質感
+bamboo_style = """
     background: 
         linear-gradient(90deg, transparent 38%, #3a7d25 40%, #3a7d25 42%, transparent 44%),
         linear-gradient(90deg, transparent 78%, #3a7d25 80%, #3a7d25 82%, transparent 84%),
@@ -30,16 +30,45 @@ bamboo_bg = """
     border-right: 4px solid #2e631d;
 """ if show_detail_bamboo else "background-color: #55a630;"
 
-# 石の質感切り替え
-stone_bg = """
+# 石の質感
+stone_style = """
     background-color: #808080;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.3'/%3E%3C/svg%3E"),
                       linear-gradient(to bottom right, #a0a0a0, #606060);
     box-shadow: inset 5px 5px 10px rgba(255,255,255,0.2), inset -10px -10px 20px rgba(0,0,0,0.5);
 """ if show_detail_stone else "background-color: #6c757d;"
 
-# HTML & CSS 組み立て
-html_code = f"""
+# 背景の砂利スタイル（条件分岐）
+container_bg = "background-image: radial-gradient(circle, #e6e6e6 10%, transparent 10%); background-size: 20px 20px;" if show_detail_stone else ""
+
+# --- HTMLパーツの組み立て（リストに追加していく方式に変更） ---
+html_parts = []
+
+# 1. 背景要素
+if show_grass:
+    html_parts.append('<div class="grass grass-1"></div><div class="grass grass-2"></div><div class="grass grass-3"></div>')
+if show_mushroom:
+    html_parts.append('<div class="mushroom"></div>')
+
+# 2. 構造物（石と支柱）
+html_parts.append('<div class="stone"></div>')
+html_parts.append('<div class="pivot-group"><div class="pivot" style="height: 120px; margin-top: -20px;"></div><div class="pivot"></div></div>')
+
+# 3. 水系
+if show_feeder:
+    html_parts.append('<div class="feeder-bamboo"></div><div class="water-stream"></div>')
+if show_splash:
+    html_parts.append('<div class="splash"></div>')
+
+# 4. メインの竹
+html_parts.append('<div class="bamboo"></div>')
+
+# HTMLの中身を結合
+inner_html = "".join(html_parts)
+
+
+# --- 最終的なHTMLコードの生成 ---
+final_html = f"""
 <style>
     /* 全体コンテナ */
     .shishiodoshi-container {{
@@ -48,7 +77,7 @@ html_code = f"""
         align_items: center;
         height: 450px;
         background-color: #f0f2f6;
-        {'''background-image: radial-gradient(circle, #e6e6e6 10%, transparent 10%); background-size: 20px 20px;''' if show_detail_stone else ''}
+        {container_bg}
         border-radius: 20px;
         position: relative;
         overflow: hidden;
@@ -59,7 +88,7 @@ html_code = f"""
     .bamboo {{
         width: 220px;
         height: 60px;
-        {bamboo_bg}
+        {bamboo_style}
         border-radius: 5px 30px 30px 5px;
         position: relative;
         transform-origin: 65% 50%;
@@ -79,7 +108,7 @@ html_code = f"""
         right: 150px;
         width: 150px;
         height: 40px;
-        {bamboo_bg}
+        {bamboo_style}
         transform: rotate(-20deg);
         border-radius: 5px;
         z-index: 5;
@@ -118,7 +147,7 @@ html_code = f"""
     .stone {{
         position: absolute;
         width: 140px; height: 90px;
-        {stone_bg}
+        {stone_style}
         border-radius: 50% 40% 30% 40% / 60% 50% 40% 40%;
         top: 65%; left: calc(50% - 100px);
         z-index: 1;
@@ -182,7 +211,7 @@ html_code = f"""
 
     @keyframes splash-anim {{
         0%, 62% {{ opacity: 0; transform: scale(0.5); }}
-        65% {{ opacity: 1; transform: scale(1.5) translateY(-20px); }} /* ヒットに合わせて出現 */
+        65% {{ opacity: 1; transform: scale(1.5) translateY(-20px); }}
         75% {{ opacity: 0; transform: scale(2.0); }}
         100% {{ opacity: 0; }}
     }}
@@ -194,22 +223,11 @@ html_code = f"""
 </style>
 
 <div class="shishiodoshi-container">
-    {'<div class="grass grass-1"></div><div class="grass grass-2"></div><div class="grass grass-3"></div>' if show_grass else ''}
-    {'<div class="mushroom"></div>' if show_mushroom else ''}
-
-    <div class="stone"></div>
-    <div class="pivot-group">
-        <div class="pivot" style="height: 120px; margin-top: -20px;"></div>
-        <div class="pivot"></div>
-    </div>
-    
-    {'<div class="feeder-bamboo"></div><div class="water-stream"></div>' if show_feeder else ''}
-    {'<div class="splash"></div>' if show_splash else ''}
-    
-    <div class="bamboo"></div>
+    {inner_html}
 </div>
 """
 
-st.markdown(html_code, unsafe_allow_html=True)
+# ここで描画！
+st.markdown(final_html, unsafe_allow_html=True)
 st.write("---")
 st.caption("全部ONにすると、もはや「わびさび」というより「パーティ」だっち🎉")
