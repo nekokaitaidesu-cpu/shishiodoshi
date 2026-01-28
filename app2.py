@@ -29,9 +29,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 ぬるぬる重力ししおどし (クリアVer) 🎋")
-st.write("スマホでも真ん中からスタート！竹を反転させて、下の竹は**クリア素材**にしたっち🍄")
-st.write("水がタプタプ溜まっていく様子を楽しんでね！もちろん掴んで動かせるよ！")
+st.title("🎋 全方位ししおどし (360°回転Ver) 🎋")
+st.write("上の竹の**「ピンクの丸」**を掴むと、360°自由に回転できるよ！🌀")
+st.write("真上に飛ばしたり、遠投したりして遊んでみてね！🍄")
 
 # シミュレーター本体（HTML/JS）
 html_code = """
@@ -42,7 +42,7 @@ html_code = """
     canvas {
         background-color: transparent;
         border-radius: 8px;
-        // box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* 影は一旦なしでスッキリ */
+        /* box-shadow: 0 4px 6px rgba(0,0,0,0.1); */
         display: block;
         margin: 0 auto;
         cursor: grab;
@@ -76,7 +76,7 @@ html_code = """
 <body>
 
 <div class="container">
-    <canvas id="simCanvas" width="600" height="500"></canvas>
+    <canvas id="simCanvas" width="600" height="550"></canvas>
     <div id="sound-text">カコーン！</div>
 </div>
 
@@ -87,13 +87,12 @@ html_code = """
 
     const CW = canvas.width;
     const CH = canvas.height;
-
-    // --- 設定 ---
     const gravity = 0.15;
+
+    // --- 竹オブジェクト ---
     
-    // 下の竹（ししおどし）
+    // 下の竹（ししおどし・クリア素材）
     const bamboo = {
-        // 初期位置を画面中央付近に計算
         x: CW / 2 + 20, 
         y: CH / 2 + 50,
         width: 180,
@@ -107,24 +106,29 @@ html_code = """
         isDumping: false,
         name: 'bamboo'
     };
-    bamboo.pivotX = bamboo.x - bamboo.width * 0.3; // 回転軸は少し左
+    bamboo.pivotX = bamboo.x - bamboo.width * 0.3;
 
-    // 上の竹（水源）- 向きを反転
+    // 上の竹（水源）
     const source = {
         x: CW / 2 - 80,
         y: CH / 2 - 100,
         width: 120,
         height: 24,
-        angle: 0.2, // 右下向き
-        name: 'source'
+        angle: 0.2, 
+        name: 'source',
+        // 回転ハンドルの位置（描画時に計算）
+        handleRadius: 15
     };
 
     let particles = [];
-    let dragTarget = null;
+    
+    // ドラッグ操作用
+    let dragTarget = null;     // 'source', 'bamboo', 'rotator'
     let dragOffsetX = 0;
     let dragOffsetY = 0;
 
-    // --- イベント関連 (省略せず記載) ---
+    // --- イベント処理 ---
+    
     function getPos(e) {
         const rect = canvas.getBoundingClientRect();
         let clientX = e.clientX;
@@ -142,24 +146,50 @@ html_code = """
 
     function handleStart(e) {
         const pos = getPos(e);
-        if (getDist(pos.x, pos.y, source.x, source.y) < 50) {
+        
+        // 1. 上の竹の「回転ハンドル」判定 (竹の根元にあると仮定)
+        // 回転軸(source.x, source.y)付近をクリックしたら回転モード
+        if (getDist(pos.x, pos.y, source.x, source.y) < source.handleRadius + 5) {
+            dragTarget = 'rotator'; // 回転モード
+            return;
+        }
+
+        // 2. 上の竹の「移動」判定 (竹の中心付近)
+        // 簡易的に中心座標を計算して判定
+        let srcCenterX = source.x + Math.cos(source.angle) * (source.width/2);
+        let srcCenterY = source.y + Math.sin(source.angle) * (source.width/2);
+        if (getDist(pos.x, pos.y, srcCenterX, srcCenterY) < 50) {
             dragTarget = source;
             dragOffsetX = pos.x - source.x;
             dragOffsetY = pos.y - source.y;
-        } else if (getDist(pos.x, pos.y, bamboo.pivotX, bamboo.y) < 60) {
+            return;
+        }
+
+        // 3. 下の竹の「移動」判定
+        if (getDist(pos.x, pos.y, bamboo.pivotX, bamboo.y) < 60) {
             dragTarget = bamboo;
             dragOffsetX = pos.x - bamboo.pivotX;
             dragOffsetY = pos.y - bamboo.y;
+            return;
         }
     }
+
     function handleMove(e) {
         if (!dragTarget) return;
         e.preventDefault();
         const pos = getPos(e);
-        if (dragTarget.name === 'source') {
+
+        if (dragTarget === 'rotator') {
+            // マウスの方向に竹を向ける
+            let dx = pos.x - source.x;
+            let dy = pos.y - source.y;
+            source.angle = Math.atan2(dy, dx);
+        }
+        else if (dragTarget === source) {
             source.x = pos.x - dragOffsetX;
             source.y = pos.y - dragOffsetY;
-        } else if (dragTarget.name === 'bamboo') {
+        } 
+        else if (dragTarget === bamboo) {
             let newPivotX = pos.x - dragOffsetX;
             let newY = pos.y - dragOffsetY;
             let offset = bamboo.x - bamboo.pivotX;
@@ -179,11 +209,10 @@ html_code = """
     canvas.addEventListener('touchend', handleEnd);
 
 
-    // --- 描画関数 (大幅アップデート！) ---
+    // --- 描画関数 ---
 
     function drawBambooRect(obj, isSource) {
         ctx.save();
-        // 回転の中心を決める
         let transX = isSource ? obj.x : obj.pivotX;
         let transY = obj.y;
         ctx.translate(transX, transY);
@@ -191,98 +220,88 @@ html_code = """
         
         let w = obj.width;
         let h = obj.height;
-        
-        // 描画の基準点（左上）
-        let relX = isSource ? -w * 0.1 : -w * 0.3; // 上の竹は右側から出るように調整
+        let relX = isSource ? 0 : -w * 0.3; // 上の竹は回転軸(0)から右へ伸びる
         let relY = -h/2;
 
-        // ドラッグ時のハイライト
-        if (dragTarget && dragTarget.name === obj.name) {
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = "yellow";
-        }
-
         if (isSource) {
-            // --- 上の竹（通常描画）---
+            // --- 上の竹 ---
             let grd = ctx.createLinearGradient(0, -h/2, 0, h/2);
             grd.addColorStop(0, "#556b2f");
             grd.addColorStop(0.5, "#8fbc8f");
             grd.addColorStop(1, "#556b2f");
             ctx.fillStyle = grd;
             ctx.fillRect(relX, relY, w, h);
+            
             // 節
             ctx.fillStyle = "#2e3b1f";
-            ctx.fillRect(relX + w * 0.2, relY, 4, h);
+            ctx.fillRect(relX + w * 0.5, relY, 4, h);
+
+            // ★回転ハンドルの描画 (根元の赤い丸)
+            ctx.beginPath();
+            ctx.arc(0, 0, obj.handleRadius, 0, Math.PI*2);
+            ctx.fillStyle = "#ff6b6b"; // 目立つピンク
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
 
         } else {
-            // --- 下の竹（クリア＆水溜まり描画）---
-            
-            // 1. 竹の内部に溜まった水を描画 (クリッピング使用)
-            ctx.save(); // クリップ用にsave
-            ctx.beginPath();
-            ctx.rect(relX, relY, w, h); // 竹の形のパスを作成
-            ctx.clip(); // くり抜く
-
-            // 水位の計算（適当な係数で調整）
+            // --- 下の竹（クリアVer）---
+            // 水
+            ctx.save(); 
+            ctx.beginPath(); ctx.rect(relX, relY, w, h); ctx.clip();
             let waterLevel = Math.min(obj.waterMass * 0.5, h * 0.9); 
             if (waterLevel > 0) {
-                ctx.fillStyle = "rgba(135, 206, 250, 0.8)"; // 水色
-                // 竹の下底から水位分の高さを描画
+                ctx.fillStyle = "rgba(135, 206, 250, 0.8)";
                 ctx.fillRect(relX, relY + h - waterLevel, w, waterLevel);
-                
-                // 水面を少し揺らす（おまけ）
-                ctx.beginPath();
-                ctx.moveTo(relX, relY + h - waterLevel);
+                // 水面ライン
+                ctx.beginPath(); ctx.moveTo(relX, relY + h - waterLevel);
                 ctx.lineTo(relX + w, relY + h - waterLevel);
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"; ctx.stroke();
             }
-            ctx.restore(); // クリップ解除
+            ctx.restore();
 
-            // 2. 半透明の竹の本体を描画
-            ctx.fillStyle = "rgba(144, 238, 144, 0.3)"; // 半透明の薄緑
+            // 本体
+            ctx.fillStyle = "rgba(144, 238, 144, 0.3)";
             ctx.fillRect(relX, relY, w, h);
-
-            // 3. 竹の枠線と節を描画
-            ctx.strokeStyle = "#556b2f";
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#556b2f"; ctx.lineWidth = 3;
             ctx.strokeRect(relX, relY, w, h);
-            
-            // 節（枠線のみ）
-            ctx.beginPath();
-            ctx.moveTo(relX + w * 0.3, relY);
-            ctx.lineTo(relX + w * 0.3, relY + h);
-            ctx.stroke();
+            // 節
+            ctx.beginPath(); ctx.moveTo(relX + w * 0.3, relY);
+            ctx.lineTo(relX + w * 0.3, relY + h); ctx.stroke();
         }
 
-        ctx.restore(); // 回転・移動の復帰
+        ctx.restore();
     }
 
 
     function update() {
         ctx.clearRect(0, 0, CW, CH);
 
-        // --- 1. 水の生成 (位置調整) ---
-        if (Math.random() * 10 < 4) { // 少し頻度アップ
-            // 上の竹の右端付近から出す
-            let startX = source.x + Math.cos(source.angle) * (source.width * 0.8);
-            let startY = source.y + Math.sin(source.angle) * (source.width * 0.8) + 5;
+        // --- 1. 水の生成 ---
+        if (Math.random() * 10 < 5) { // 勢いよく
+            // 竹の先端位置を計算 (回転に対応)
+            let tipX = source.x + Math.cos(source.angle) * source.width;
+            let tipY = source.y + Math.sin(source.angle) * source.width;
             
+            // 発射速度ベクトルの計算
+            let speed = 4 + Math.random();
+            let velX = Math.cos(source.angle) * speed;
+            let velY = Math.sin(source.angle) * speed;
+
             particles.push({
-                x: startX,
-                y: startY,
-                // 右下に向かって発射
-                vx: Math.cos(source.angle) * 3 + Math.random(),
-                vy: Math.sin(source.angle) * 3,
+                x: tipX,
+                y: tipY + (Math.random()*6 - 3),
+                vx: velX,
+                vy: velY,
                 radius: 2.5 + Math.random() * 2,
                 state: 'falling'
             });
         }
 
         // --- 2. 竹の物理計算 ---
-        let force = (bamboo.targetAngle - bamboo.angle) * 0.08; // 復元力強め
-        let waterForce = bamboo.waterMass * 0.003; // 水の重み係数調整
+        let force = (bamboo.targetAngle - bamboo.angle) * 0.08;
+        let waterForce = bamboo.waterMass * 0.003;
         bamboo.velocity += force + waterForce;
         bamboo.velocity *= 0.94;
         bamboo.angle += bamboo.velocity;
@@ -301,7 +320,7 @@ html_code = """
             bamboo.isDumping = false;
         }
 
-        // 先端位置（受け口）- 右端に変更
+        // 下の竹の受け口位置
         let tipOffset = bamboo.width * 0.6; 
         let tipX = bamboo.pivotX + Math.cos(bamboo.angle) * tipOffset;
         let tipY = bamboo.y + Math.sin(bamboo.angle) * tipOffset;
@@ -313,15 +332,19 @@ html_code = """
             let p = particles[i];
             
             if (p.state === 'falling') {
-                p.vy += gravity;
+                p.vy += gravity; // 重力
                 p.x += p.vx;
                 p.y += p.vy;
                 
+                // 画面端バウンド（おまけ：壁で跳ね返ると面白いかも）
+                // if (p.x < 0 || p.x > CW) p.vx *= -0.5;
+
+                // 下の竹に入る判定
                 let dx = p.x - tipX;
                 let dy = p.y - tipY;
                 let dist = Math.sqrt(dx*dx + dy*dy);
                 
-                // 判定調整
+                // 判定
                 if (dist < 30 && p.vy > 0 && bamboo.angle < 0) {
                     p.state = 'trapped';
                     p.vx = 0; p.vy = 0;
@@ -329,15 +352,12 @@ html_code = """
                 if (p.y > CH) { particles.splice(i, 1); continue; }
             }
             else if (p.state === 'trapped') {
-                bamboo.waterMass += p.radius * 3; // 質量加算のみ行う（描画はdrawBambooRectで）
+                bamboo.waterMass += p.radius * 3;
                 
-                // こぼれる処理
                 if (bamboo.angle > 0.3) {
                     p.state = 'dumped';
-                    // 竹の角度に合わせて放出
                     p.vx = Math.cos(bamboo.angle) * 4;
                     p.vy = Math.sin(bamboo.angle) * 4;
-                    // 放出位置を竹の先端に設定
                     p.x = bamboo.pivotX + Math.cos(bamboo.angle) * (bamboo.width*0.7);
                     p.y = bamboo.y + Math.sin(bamboo.angle) * (bamboo.width*0.7);
                 }
@@ -349,7 +369,6 @@ html_code = """
                  if (p.y > CH) { particles.splice(i, 1); continue; }
             }
             
-            // trapped以外の水粒子を描画
             if (p.state !== 'trapped') {
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
@@ -364,9 +383,9 @@ html_code = """
         ctx.fillStyle = "#3e2723";
         ctx.fillRect(bamboo.pivotX - 5, bamboo.y + 10, 10, 150);
 
-        // 下の竹（クリア＆水）
+        // 下の竹
         drawBambooRect(bamboo, false);
-        // 上の竹（通常）
+        // 上の竹
         drawBambooRect(source, true);
         
         requestAnimationFrame(update);
@@ -387,4 +406,4 @@ html_code = """
 </html>
 """
 
-components.html(html_code, height=550)
+components.html(html_code, height=600)
