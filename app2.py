@@ -8,11 +8,11 @@ st.set_page_config(
     layout="centered"
 )
 
-# スタイル定義（和風な背景とフォント）
+# スタイル定義
 st.markdown("""
     <style>
     body {
-        background-color: #f4f1ea; /* 和紙っぽい色 */
+        background-color: #f4f1ea;
         color: #595857;
         font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
     }
@@ -26,22 +26,12 @@ st.markdown("""
         padding-bottom: 10px;
         color: #2e3b1f;
     }
-    .stButton>button {
-        background-color: #6b8e23;
-        color: white;
-        border-radius: 20px;
-        border: none;
-        padding: 10px 20px;
-        font-weight: bold;
-    }
-    .stButton>button:hover {
-        background-color: #556b2f;
-    }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🎋 ぬるぬる重力ししおどし 🎋")
-st.write("水が溜まると重力で傾いて……カコーン！となる様子を眺めるっち🍄")
+st.write("竹を**クリック（タップ）して掴める**ようにしたっち！🍄")
+st.write("好きな場所に動かして、水がうまく入るように調整してね！")
 
 # シミュレーター本体（HTML/JS）
 html_code = """
@@ -55,11 +45,17 @@ html_code = """
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         display: block;
         margin: 0 auto;
+        cursor: grab; /* 掴める感を出す */
+        touch-action: none; /* スマホでスクロールしないようにする */
+    }
+    canvas:active {
+        cursor: grabbing;
     }
     .container {
         position: relative;
         width: 100%;
         text-align: center;
+        user-select: none; /* 文字選択防止 */
     }
     #sound-text {
         position: absolute;
@@ -73,6 +69,7 @@ html_code = """
         pointer-events: none;
         font-family: serif;
         transition: opacity 0.1s;
+        text-shadow: 2px 2px 0px #fff;
     }
 </style>
 </head>
@@ -90,61 +87,159 @@ html_code = """
 
     // --- 設定 ---
     const gravity = 0.15;
-    const waterSpawnRate = 3; // フレームごとの生成確率(低いほど頻度高)
     
     // 竹の設定
+    // ドラッグ判定のために isDragging などを追加
     const bamboo = {
         x: 300,
         y: 250,
         width: 160,
         height: 30,
-        angle: -0.2, // ラジアン (初期角度：少し上向き)
-        targetAngle: -0.2, // 戻るべき角度
-        pivotX: 0, // 相対的な回転軸X
+        angle: -0.2,
+        targetAngle: -0.2,
+        pivotX: 0, 
         velocity: 0,
-        mass: 100, // 竹自体の重さ感覚
-        waterMass: 0, // 溜まった水の重さ
-        isDumping: false
+        mass: 100,
+        waterMass: 0,
+        isDumping: false,
+        name: 'bamboo' // 判定用
     };
-    // 回転軸は竹の左寄り(1/3くらいの位置)に設定
+    // 軸位置の初期計算
     bamboo.pivotX = bamboo.x - bamboo.width * 0.2;
 
-    // 水粒子配列
-    let particles = [];
-    
-    // 上の竹（水源）
     const source = {
         x: 200,
         y: 100,
         width: 120,
-        angle: 0.1
+        angle: 0.1,
+        name: 'source' // 判定用
     };
 
-    function drawBambooRect(bx, by, w, h, angle) {
+    let particles = [];
+    
+    // ドラッグ操作用の変数
+    let dragTarget = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    // マウス/タッチ座標の取得
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        let clientX = e.clientX;
+        let clientY = e.clientY;
+        
+        // スマホ対応
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+            // touchend用
+             clientX = e.changedTouches[0].clientX;
+             clientY = e.changedTouches[0].clientY;
+        }
+
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+    }
+
+    // 距離計算（当たり判定用）
+    function getDist(x1, y1, x2, y2) {
+        return Math.sqrt((x1-x2)**2 + (y1-y2)**2);
+    }
+
+    // --- イベントリスナー登録 ---
+    
+    function handleStart(e) {
+        // e.preventDefault(); // 一旦外す（スクロール阻害の調整）
+        const pos = getPos(e);
+        
+        // 上の竹の判定（中心付近をクリックしたら）
+        if (getDist(pos.x, pos.y, source.x, source.y) < 50) {
+            dragTarget = source;
+            dragOffsetX = pos.x - source.x;
+            dragOffsetY = pos.y - source.y;
+        }
+        // 下の竹の判定（回転軸付近をクリックしたら）
+        else if (getDist(pos.x, pos.y, bamboo.pivotX, bamboo.y) < 60) {
+            dragTarget = bamboo;
+            dragOffsetX = pos.x - bamboo.pivotX; // pivotXを基準に動かす
+            dragOffsetY = pos.y - bamboo.y;
+        }
+    }
+
+    function handleMove(e) {
+        if (!dragTarget) return;
+        e.preventDefault(); // ドラッグ中はスクロールさせない
+        const pos = getPos(e);
+
+        if (dragTarget.name === 'source') {
+            source.x = pos.x - dragOffsetX;
+            source.y = pos.y - dragOffsetY;
+        } else if (dragTarget.name === 'bamboo') {
+            // 下の竹は pivotX と y を更新する
+            let newPivotX = pos.x - dragOffsetX;
+            let newY = pos.y - dragOffsetY;
+            
+            // 相対関係を維持して x も更新（念のため）
+            let offset = bamboo.x - bamboo.pivotX;
+            bamboo.pivotX = newPivotX;
+            bamboo.y = newY;
+            bamboo.x = newPivotX + offset;
+        }
+    }
+
+    function handleEnd(e) {
+        dragTarget = null;
+    }
+
+    // PC(マウス)
+    canvas.addEventListener('mousedown', handleStart);
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('mouseup', handleEnd);
+    canvas.addEventListener('mouseleave', handleEnd);
+
+    // スマホ(タッチ)
+    canvas.addEventListener('touchstart', handleStart, {passive: false});
+    canvas.addEventListener('touchmove', handleMove, {passive: false});
+    canvas.addEventListener('touchend', handleEnd);
+
+
+    // --- 描画関数 ---
+
+    function drawBambooRect(bx, by, w, h, angle, isSource) {
         ctx.save();
-        ctx.translate(bx, by); // 回転軸へ移動
+        ctx.translate(bx, by);
         ctx.rotate(angle);
         
-        // 竹の描画（緑のグラデーション）
+        // 掴んでる時は枠線を出す（わかりやすく）
+        let isSelected = false;
+        if (dragTarget) {
+            if (isSource && dragTarget.name === 'source') isSelected = true;
+            if (!isSource && dragTarget.name === 'bamboo') isSelected = true;
+        }
+
+        if (isSelected) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "yellow";
+        }
+
         let grd = ctx.createLinearGradient(0, -h/2, 0, h/2);
         grd.addColorStop(0, "#556b2f");
         grd.addColorStop(0.5, "#8fbc8f");
         grd.addColorStop(1, "#556b2f");
         ctx.fillStyle = grd;
         
-        // 竹筒（角丸四角形っぽく）
-        // 回転軸(0,0)から描画位置を調整
-        // bamboo.x, bamboo.yは回転軸の位置として渡されている前提
-        // ここではPivotからの相対描画
-        let relX = -bamboo.width * 0.3; // 軸の左側
-        if (bx === source.x) relX = -w/2; // 上の竹用
+        let relX = -bamboo.width * 0.3; // 下の竹用オフセット
+        if (isSource) relX = -w/2;      // 上の竹用オフセット
         
         ctx.fillRect(relX, -h/2, w, h);
         
-        // 節（フシ）を描く
+        // 節
         ctx.fillStyle = "#2e3b1f";
         ctx.fillRect(relX + w * 0.1, -h/2, 4, h);
-        if (bx !== source.x) ctx.fillRect(relX + w * 0.8, -h/2, 4, h);
+        if (!isSource) ctx.fillRect(relX + w * 0.8, -h/2, 4, h);
 
         ctx.restore();
     }
@@ -153,8 +248,7 @@ html_code = """
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // --- 1. 水の生成 ---
-        if (Math.random() * 10 < 3) { // 確率で水滴生成
-            // 上の竹の先から出る
+        if (Math.random() * 10 < 3) {
             let startX = source.x + Math.cos(source.angle) * (source.width/2) + (Math.random()*4 - 2);
             let startY = source.y + Math.sin(source.angle) * (source.width/2) + 10;
             
@@ -164,33 +258,20 @@ html_code = """
                 vx: Math.cos(source.angle) * 2,
                 vy: Math.sin(source.angle) * 2,
                 radius: 2 + Math.random() * 2,
-                state: 'falling' // falling, trapped, dumped
+                state: 'falling'
             });
         }
 
         // --- 2. 竹（ししおどし）の物理計算 ---
-        
-        // トルク計算 (簡易版)
-        // 水がないときは左側(短い方)が重いので左に傾こうとする -> 結果、右が上がる(targetAngle)
-        // 水が溜まると右側(長い方)が重くなり、右に傾く
-        
-        // 復元力（バネっぽい動き）
         let force = (bamboo.targetAngle - bamboo.angle) * 0.05;
-        
-        // 水の重みによる力
-        // 溜まっている水が多いほど角度が増える力
         let waterForce = bamboo.waterMass * 0.002;
-        
         bamboo.velocity += force + waterForce;
-        bamboo.velocity *= 0.95; // 減衰（空気抵抗）
+        bamboo.velocity *= 0.95;
         bamboo.angle += bamboo.velocity;
 
-        // 角度制限 (地面に当たる or 戻りすぎ防止)
-        if (bamboo.angle > 0.8) { // 下にガコンといった！
+        if (bamboo.angle > 0.8) {
             bamboo.angle = 0.8;
-            bamboo.velocity *= -0.4; // 跳ね返り
-            
-            // カコーン判定
+            bamboo.velocity *= -0.4;
             if (!bamboo.isDumping && bamboo.waterMass > 10) {
                  showSoundText();
             }
@@ -202,15 +283,13 @@ html_code = """
             bamboo.isDumping = false;
         }
 
-        // 竹の先端位置（水が入る口）の計算
-        // 回転軸からのオフセット
+        // 先端位置（受け口）の更新（ドラッグで動くので毎回計算）
         let tipOffset = bamboo.width * 0.7; 
         let tipX = bamboo.pivotX + Math.cos(bamboo.angle) * tipOffset;
         let tipY = bamboo.y + Math.sin(bamboo.angle) * tipOffset;
 
-
         // --- 3. 水粒子の更新 ---
-        bamboo.waterMass = 0; // リセットして再集計
+        bamboo.waterMass = 0; 
 
         for (let i = particles.length - 1; i >= 0; i--) {
             let p = particles[i];
@@ -220,43 +299,34 @@ html_code = """
                 p.x += p.vx;
                 p.y += p.vy;
                 
-                // 竹の口に入ったか判定 (簡易的な矩形判定)
-                // 竹の角度に合わせて受け口が変わる
+                // 受け口判定
                 let dx = p.x - tipX;
                 let dy = p.y - tipY;
                 let dist = Math.sqrt(dx*dx + dy*dy);
                 
-                if (dist < 20 && p.vy > 0 && bamboo.angle < 0.2) {
+                // 判定半径を少し広げて入りやすくする
+                if (dist < 25 && p.vy > 0 && bamboo.angle < 0.2) {
                     p.state = 'trapped';
                     p.vx = 0;
                     p.vy = 0;
                 }
                 
-                // 画面外削除
                 if (p.y > canvas.height) {
                     particles.splice(i, 1);
                     continue;
                 }
             }
             else if (p.state === 'trapped') {
-                // 竹の中にいる
-                // 竹の角度に合わせて位置を更新
-                // 簡易的に、竹の先端から少し内側にランダム配置されているように見せる
-                // 実際は物理演算せず、数としてカウントするだけでも見た目はそれっぽい
-                bamboo.waterMass += p.radius * 3; // 質量加算
-                
-                // 描画位置を竹の動きに同期させる
-                // ここでは簡易的に「竹の先端付近」に固定して回転させる
-                let trapOffset = bamboo.width * (0.4 + Math.random() * 0.3); // 先端寄り
+                bamboo.waterMass += p.radius * 3;
+                let trapOffset = bamboo.width * (0.4 + Math.random() * 0.3);
+                // pivotX基準で追従
                 p.x = bamboo.pivotX + Math.cos(bamboo.angle) * trapOffset;
-                p.y = bamboo.y + Math.sin(bamboo.angle) * trapOffset - 5; // 竹の厚み分浮かす
+                p.y = bamboo.y + Math.sin(bamboo.angle) * trapOffset - 5;
 
-                // 竹が傾きすぎたらこぼれる
                 if (bamboo.angle > 0.4) {
                     p.state = 'dumped';
                     p.vx = Math.cos(bamboo.angle) * 3;
                     p.vy = Math.sin(bamboo.angle) * 3;
-                    // 水が減る処理はループの最後で自然に行われる(waterMassが次回減る)
                 }
             }
             else if (p.state === 'dumped') {
@@ -269,22 +339,21 @@ html_code = """
                 }
             }
             
-            // 描画
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(135, 206, 250, 0.8)"; // 水色
+            ctx.fillStyle = "rgba(135, 206, 250, 0.8)";
             ctx.fill();
         }
 
         // --- 4. 竹の描画 ---
         // 上の竹
-        drawBambooRect(source.x, source.y, source.width, 20, source.angle);
+        drawBambooRect(source.x, source.y, source.width, 20, source.angle, true);
         
         // 下の竹（ししおどし）
-        // 軸を中心に回転
-        drawBambooRect(bamboo.pivotX, bamboo.y, bamboo.width, bamboo.height, bamboo.angle);
+        drawBambooRect(bamboo.pivotX, bamboo.y, bamboo.width, bamboo.height, bamboo.angle, false);
         
-        // 支柱
+        // 支柱（下の竹と一緒に動く）
+        ctx.shadowBlur = 0; // 影リセット
         ctx.fillStyle = "#3e2723";
         ctx.fillRect(bamboo.pivotX - 5, bamboo.y, 10, 150);
 
@@ -293,22 +362,17 @@ html_code = """
 
     function showSoundText() {
         soundText.style.opacity = 1;
-        soundText.style.transform = "translate(-50%, -60%) scale(1.2)"; // ちょっと跳ねる
+        soundText.style.transform = "translate(-50%, -60%) scale(1.2)";
         setTimeout(() => {
             soundText.style.opacity = 0;
             soundText.style.transform = "translate(-50%, -50%) scale(1.0)";
         }, 600);
     }
 
-    // スタート
     update();
 </script>
 </body>
 </html>
 """
 
-# Streamlitに埋め込み（高さを確保）
-components.html(html_code, height=450)
-
-st.write("---")
-st.info("💡 解説：竹の中に水粒子（青い丸）が止まると`mass`（重さ）が増える計算をしてるよ。一定以上重くなると、重力に負けて右に回転して水がこぼれるっち！")
+components.html(html_code, height=500)
