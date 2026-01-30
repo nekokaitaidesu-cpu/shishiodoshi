@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 
 # ページ設定
 st.set_page_config(
-    page_title="無限カオスししおどし",
+    page_title="ししおどしシミュレーター",
     page_icon="🎋",
     layout="wide"
 )
@@ -33,9 +33,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 無限カオスししおどし (スイッチ連動Ver🐣) 🎋")
-st.write("「💥仲間割れ」スイッチを入れると、**受け石の物理演算も解禁**されるよ！")
-st.write("OFFの時は、ちゃんと良い子にして水を受け止めてくれるはず……たぶん🍄")
+st.title("🎋 ししおどしシミュレーター 🎋")
+st.write("上手にいっぱい水を入れると「カッコーン」！")
+
 
 # シミュレーター本体（HTML/JS）
 html_code = """
@@ -166,7 +166,7 @@ html_code = """
         <input type="range" id="chickSlider" min="0" max="30" value="1">
     </div>
     <div class="control-group">
-        <label>💥仲間割れ</label>
+        <label>💥判定追加</label>
         <label class="toggle-switch">
             <input type="checkbox" id="collisionToggle">
             <span class="slider"></span>
