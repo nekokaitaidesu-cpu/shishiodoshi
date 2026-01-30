@@ -26,16 +26,16 @@ st.markdown("""
         border-bottom: 2px solid #6b8e23;
         padding-bottom: 10px;
         color: #2e3b1f;
-        margin-top: 100px; /* 固定ヘッダーの分だけ下げる */
+        margin-top: 100px;
     }
     .stHtml { margin: 0 auto; }
     iframe { border: none; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 無限カオスししおどし (石、発見Ver) 🎋")
-st.write("石（水鉢）を画面内に救出してきたっち！🍄")
-st.write("これで水が溜まる様子もしっかり見えるはず！")
+st.title("🎋 無限カオスししおどし (with 🐣) 🎋")
+st.write("床に**「ひよこ」**を放ったっち！🐣")
+st.write("水が溜まるとプカプカ浮いてくるよ！かわいがってあげてね😂")
 
 # シミュレーター本体（HTML/JS）
 html_code = """
@@ -61,7 +61,6 @@ html_code = """
     }
     canvas:active { cursor: grabbing; }
     
-    /* Sticky Controls */
     .controls {
         position: -webkit-sticky;
         position: sticky;
@@ -89,7 +88,7 @@ html_code = """
 
     #sound-text {
         position: absolute;
-        top: 40%; /* 少し上に */
+        top: 40%; 
         left: 50%;
         transform: translate(-50%, -50%);
         font-size: 4rem; 
@@ -136,18 +135,18 @@ html_code = """
 
     function resizeCanvas() {
         canvas.width = window.innerWidth;
-        canvas.height = 900; // 高さを900に設定（見やすく）
+        canvas.height = 900; 
     }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
     const gravity = 0.15;
 
-    // --- オブジェクト定義 (位置を全体的に上にずらしました) ---
+    // --- オブジェクト定義 ---
 
     const bamboo = {
         x: canvas.width / 2 + 20, 
-        y: 350, // 400 -> 350
+        y: 350, 
         width: 180,
         height: 36,
         angle: -0.3,
@@ -163,7 +162,7 @@ html_code = """
 
     const source = {
         x: canvas.width / 2 - 80,
-        y: 150, // 200 -> 150
+        y: 150, 
         width: 120,
         height: 24,
         angle: 0.2, 
@@ -173,12 +172,23 @@ html_code = """
 
     const basin = {
         x: canvas.width / 2 + 50,
-        y: 650, // ★ここ！900 -> 650 に変更！これで見えるはず！
+        y: 650, 
         width: 200,
         height: 80,
         waterLevel: 0,
         maxLevel: 70, 
         name: 'basin'
+    };
+
+    // ★新登場！ひよこオブジェクト🐣
+    const chick = {
+        x: canvas.width / 2 - 100, // 最初はちょっと左に
+        y: 850, // 床に置く
+        vx: 0,
+        vy: 0,
+        radius: 20, // 大きさ
+        angle: 0, // 傾き（ゆらゆら用）
+        name: 'chick'
     };
 
     let particles = [];
@@ -199,6 +209,9 @@ html_code = """
 
     function handleStart(e) {
         const pos = getPos(e);
+        // 判定順：ひよこ -> ハンドル -> ソース -> 竹 -> 受け石 (ひよこ最優先！)
+        if (getDist(pos.x, pos.y, chick.x, chick.y) < chick.radius * 1.5) { dragTarget = chick; dragOffsetX = pos.x - chick.x; dragOffsetY = pos.y - chick.y; return; }
+
         if (getDist(pos.x, pos.y, source.x, source.y) < source.handleRadius + 15) { dragTarget = 'rotator'; return; }
         
         let srcCX = source.x + Math.cos(source.angle) * (source.width/2);
@@ -223,6 +236,11 @@ html_code = """
             let offset = bamboo.x - bamboo.pivotX; bamboo.pivotX = newPivotX; bamboo.y = newY; bamboo.x = newPivotX + offset; 
         } else if (dragTarget === basin) {
             basin.x = pos.x - dragOffsetX; basin.y = pos.y - dragOffsetY;
+        } else if (dragTarget === chick) {
+            // ひよこを掴んで移動
+            chick.x = pos.x - dragOffsetX;
+            chick.y = pos.y - dragOffsetY;
+            chick.vx = 0; chick.vy = 0; // 掴んでる間は物理リセット
         }
     }
     function handleEnd(e) { dragTarget = null; }
@@ -231,6 +249,47 @@ html_code = """
     canvas.addEventListener('touchstart', handleStart, {passive: false}); canvas.addEventListener('touchmove', handleMove, {passive: false}); canvas.addEventListener('touchend', handleEnd);
 
     // --- 描画関数 ---
+    
+    // ひよこ描画🐣
+    function drawChick() {
+        ctx.save();
+        ctx.translate(chick.x, chick.y);
+        // 水に浮いてる感を出すために少し揺らす
+        let wobble = Math.sin(Date.now() / 200) * 0.1;
+        ctx.rotate(chick.angle + wobble);
+
+        // 体（黄色い丸）
+        ctx.beginPath();
+        ctx.arc(0, 0, chick.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "#FFEB3B"; // 黄色
+        ctx.fill();
+        ctx.strokeStyle = "#FBC02D";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 目（黒点）
+        ctx.beginPath();
+        ctx.arc(8, -5, 2, 0, Math.PI * 2); // 右目
+        ctx.fillStyle = "#000";
+        ctx.fill();
+        
+        // くちばし（オレンジ三角）
+        ctx.beginPath();
+        ctx.moveTo(15, 0);
+        ctx.lineTo(22, 3);
+        ctx.lineTo(15, 6);
+        ctx.fillStyle = "#FF9800";
+        ctx.fill();
+
+        // 羽（ちょっと濃い黄色）
+        ctx.beginPath();
+        ctx.ellipse(-5, 5, 8, 5, 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#FDD835";
+        ctx.fill();
+
+        ctx.restore();
+    }
+
     function drawBambooRect(obj, isSource) {
         ctx.save();
         let transX = isSource ? obj.x : obj.pivotX; let transY = obj.y;
@@ -261,11 +320,9 @@ html_code = """
         ctx.save();
         ctx.fillStyle = "#808080";
         let w = basin.width; let h = basin.height; let x = basin.x - w/2; let y = basin.y;
-
         ctx.save(); ctx.beginPath();
         ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w - 10, y + h); ctx.lineTo(x + 10, y + h); ctx.closePath();
         ctx.clip(); 
-
         if (basin.waterLevel > 0) {
             let visibleLevel = Math.min(basin.waterLevel, basin.maxLevel);
             let waterH = (visibleLevel / basin.maxLevel) * h;
@@ -273,7 +330,6 @@ html_code = """
             ctx.fillRect(x, y + h - waterH, w, waterH);
         }
         ctx.restore();
-
         ctx.beginPath();
         ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w - 10, y + h); ctx.lineTo(x + 10, y + h); ctx.closePath();
         ctx.lineWidth = 8; ctx.strokeStyle = "#696969"; ctx.stroke();
@@ -283,13 +339,54 @@ html_code = """
     function update() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
+        // --- 床の水 ---
+        let waterSurfaceY = canvas.height - floorWaterHeight; // 水面のY座標
         if (floorWaterHeight > 0) {
             ctx.fillStyle = "rgba(0, 100, 200, 0.5)";
-            ctx.fillRect(0, canvas.height - floorWaterHeight, canvas.width, floorWaterHeight);
+            ctx.fillRect(0, waterSurfaceY, canvas.width, floorWaterHeight);
+        }
+
+        // --- ひよこの物理計算🐣 ---
+        if (dragTarget !== chick) {
+            // 重力
+            chick.vy += gravity;
+            
+            // 浮力計算
+            let chickBottom = chick.y + chick.radius;
+            // 水面より下にあるか？
+            if (chickBottom > waterSurfaceY) {
+                // 水に浸かってる深さ
+                let depth = chickBottom - waterSurfaceY;
+                // 浮力 (深さに応じて強く)
+                let buoyancy = depth * 0.05; 
+                chick.vy -= buoyancy;
+                
+                // 水の抵抗 (減衰)
+                chick.vy *= 0.9;
+                chick.vx *= 0.95; // 横移動も抵抗を受ける
+            } else {
+                // 空中なら空気抵抗少し
+                chick.vx *= 0.99;
+            }
+            
+            // 床との衝突
+            if (chick.y + chick.radius > canvas.height) {
+                chick.y = canvas.height - chick.radius;
+                chick.vy *= -0.3; // 少し跳ねる
+            }
+            
+            // 壁との衝突
+            if (chick.x < chick.radius) { chick.x = chick.radius; chick.vx *= -0.5; }
+            if (chick.x > canvas.width - chick.radius) { chick.x = canvas.width - chick.radius; chick.vx *= -0.5; }
+
+            // 位置更新
+            chick.x += chick.vx;
+            chick.y += chick.vy;
         }
 
         let amountVal = parseInt(amountSlider.value); let powerVal = parseInt(powerSlider.value);
 
+        // --- 1. 水の生成 ---
         if (Math.random() * 50 < amountVal * 2) { 
             let tipX = source.x + Math.cos(source.angle) * source.width;
             let tipY = source.y + Math.sin(source.angle) * source.width;
@@ -298,6 +395,7 @@ html_code = """
             particles.push({ x: tipX, y: tipY + (Math.random()*6-3), vx: velX, vy: velY, radius: 2 + Math.random() * 3, state: 'falling' });
         }
 
+        // --- 2. 竹の物理 ---
         let k = 0.02; let force = (bamboo.targetAngle - bamboo.angle) * k;
         let waterForce = bamboo.waterMass * 0.0003; 
         bamboo.velocity += force + waterForce; bamboo.velocity *= 0.98; bamboo.angle += bamboo.velocity;
@@ -308,6 +406,7 @@ html_code = """
         }
         if (bamboo.angle < bamboo.targetAngle) { bamboo.angle = bamboo.targetAngle; bamboo.velocity = 0; bamboo.isDumping = false; }
 
+        // --- 3. 粒子更新 ---
         let pivotX = bamboo.pivotX; let pivotY = bamboo.y;
         bamboo.waterMass = 0; 
         
@@ -322,6 +421,7 @@ html_code = """
                     let localX = rx * Math.cos(-bamboo.angle) - ry * Math.sin(-bamboo.angle);
                     let localY = rx * Math.sin(-bamboo.angle) + ry * Math.cos(-bamboo.angle);
                     let tipStart = bamboo.width * 0.7; 
+                    // ファンネル無し判定
                     let inBodyX = (localX > tipStart - 10 && localX < tipStart + 20);
                     let inBodyY = (localY > -25 && localY < 25); 
                     if (inBodyX && inBodyY && p.vy > 0) { p.state = 'trapped'; p.vx = 0; p.vy = 0; }
@@ -335,6 +435,17 @@ html_code = """
                         p.state = 'overflow'; if (p.vx === 0) p.vx = (Math.random() - 0.5) * 2;
                     }
                 }
+                
+                // ひよことの衝突（おまけ：ひよこに水が当たるとちょっと押される）
+                let dx = p.x - chick.x;
+                let dy = p.y - chick.y;
+                if (Math.sqrt(dx*dx + dy*dy) < chick.radius + p.radius) {
+                    if (dragTarget !== chick) {
+                        chick.vx += p.vx * 0.1; // 水流で押される
+                        chick.vy += p.vy * 0.1;
+                    }
+                }
+
                 if (p.y > canvas.height) { 
                     floorWaterHeight = Math.min(floorWaterHeight + 0.2, 500); 
                     particles.splice(i, 1); continue; 
@@ -384,6 +495,7 @@ html_code = """
 
         ctx.fillStyle = "#3e2723"; ctx.fillRect(bamboo.pivotX - 5, bamboo.y + 10, 10, 600);
         drawBasin(); 
+        drawChick(); // ★ひよこを描画（水の後、最前面）
         drawBambooRect(bamboo, false); 
         drawBambooRect(source, true);
         requestAnimationFrame(update);
@@ -400,5 +512,4 @@ html_code = """
 </html>
 """
 
-# 高さを850くらいにして、フレーム内スクロールも維持しつつ、石が見える位置に！
 components.html(html_code, height=850)
