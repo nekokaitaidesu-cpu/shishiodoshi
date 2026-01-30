@@ -25,7 +25,7 @@ st.markdown("""
         text-align: center;
         border-bottom: 2px solid #6b8e23;
         padding-bottom: 10px;
-        color: #000000;
+        color: #2e3b1f !important; 
         margin-top: 100px;
     }
     .stHtml { margin: 0 auto; }
