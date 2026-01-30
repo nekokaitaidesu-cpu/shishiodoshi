@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 st.set_page_config(
     page_title="無限カオスししおどし",
     page_icon="🎋",
-    layout="wide" # ワイド表示
+    layout="wide"
 )
 
 # スタイル定義
@@ -28,15 +28,14 @@ st.markdown("""
         color: #2e3b1f;
         margin-top: 100px; /* 固定ヘッダーの分だけ下げる */
     }
-    /* iframeの余白調整 */
     .stHtml { margin: 0 auto; }
     iframe { border: none; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 無限カオスししおどし (追従スライダーVer) 🎋")
-st.write("スライダーが画面トップに張り付くように改造したっち！🍄")
-st.write("竹の先端もスッキリカット✂️ これで心置きなく水没できるね😂")
+st.title("🎋 無限カオスししおどし (石、発見Ver) 🎋")
+st.write("石（水鉢）を画面内に救出してきたっち！🍄")
+st.write("これで水が溜まる様子もしっかり見えるはず！")
 
 # シミュレーター本体（HTML/JS）
 html_code = """
@@ -45,15 +44,13 @@ html_code = """
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <style>
-    /* bodyをスクロール可能にする */
     body { 
         margin: 0; 
         font-family: sans-serif; 
         background-color: transparent;
-        overflow-y: auto; /* 縦スクロール許可 */
+        overflow-y: auto; 
         height: auto;
     }
-    
     canvas {
         background-color: transparent;
         display: block;
@@ -61,28 +58,25 @@ html_code = """
         cursor: grab;
         touch-action: none;
         border: 2px dashed rgba(107, 142, 35, 0.3);
-        /* Canvas自体の高さはJSで指定 */
     }
     canvas:active { cursor: grabbing; }
     
-    /* --- コントロールパネル（Stickyで追従） --- */
+    /* Sticky Controls */
     .controls {
-        position: -webkit-sticky; /* Safari対応 */
-        position: sticky;         /* ここがミソ！ */
-        top: 0;                   /* 上端に張り付く */
-        
+        position: -webkit-sticky;
+        position: sticky;
+        top: 0;
         width: 100%;
         box-sizing: border-box;
         padding: 10px 15px;
         background: rgba(255,255,255,0.95);
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         border-bottom: 1px solid #ccc;
-        
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
         gap: 10px;
-        z-index: 1000; /* 最前面 */
+        z-index: 1000;
     }
     .control-group {
         display: flex;
@@ -93,10 +87,9 @@ html_code = """
     label { font-size: 0.85rem; font-weight: bold; color: #556b2f; margin-right: 5px; white-space: nowrap; }
     input[type=range] { flex-grow: 1; cursor: pointer; }
 
-    /* --- カコーン！テキスト --- */
     #sound-text {
         position: absolute;
-        top: 50%;
+        top: 40%; /* 少し上に */
         left: 50%;
         transform: translate(-50%, -50%);
         font-size: 4rem; 
@@ -113,11 +106,7 @@ html_code = """
         z-index: 50;
         transition: opacity 0.1s; 
     }
-    
-    .container {
-        position: relative;
-        /* 高さはCanvasに合わせて伸びる */
-    }
+    .container { position: relative; }
 </style>
 </head>
 <body>
@@ -145,21 +134,20 @@ html_code = """
     const amountSlider = document.getElementById('amountSlider');
     const powerSlider = document.getElementById('powerSlider');
 
-    // 内部キャンバスは大きく確保
     function resizeCanvas() {
-        canvas.width = window.innerWidth; // 幅はいっぱい
-        canvas.height = 1400; // ★縦にさらに長く！浸水エリア確保
+        canvas.width = window.innerWidth;
+        canvas.height = 900; // 高さを900に設定（見やすく）
     }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
     const gravity = 0.15;
 
-    // --- オブジェクト定義 ---
+    // --- オブジェクト定義 (位置を全体的に上にずらしました) ---
 
     const bamboo = {
         x: canvas.width / 2 + 20, 
-        y: 400,
+        y: 350, // 400 -> 350
         width: 180,
         height: 36,
         angle: -0.3,
@@ -170,13 +158,12 @@ html_code = """
         waterMass: 0,
         isDumping: false,
         name: 'bamboo',
-        // funnelSize: 70 <- 撤去！
     };
     bamboo.pivotX = bamboo.x - bamboo.width * 0.3;
 
     const source = {
         x: canvas.width / 2 - 80,
-        y: 200,
+        y: 150, // 200 -> 150
         width: 120,
         height: 24,
         angle: 0.2, 
@@ -186,7 +173,7 @@ html_code = """
 
     const basin = {
         x: canvas.width / 2 + 50,
-        y: 900,
+        y: 650, // ★ここ！900 -> 650 に変更！これで見えるはず！
         width: 200,
         height: 80,
         waterLevel: 0,
@@ -196,12 +183,11 @@ html_code = """
 
     let particles = [];
     let floorWaterHeight = 0; 
-
     let dragTarget = null;
     let dragOffsetX = 0;
     let dragOffsetY = 0;
 
-    // --- 操作イベント ---
+    // --- イベント ---
     function getPos(e) {
         const rect = canvas.getBoundingClientRect();
         let clientX = e.clientX; let clientY = e.clientY;
@@ -244,9 +230,7 @@ html_code = """
     canvas.addEventListener('mousedown', handleStart); canvas.addEventListener('mousemove', handleMove); canvas.addEventListener('mouseup', handleEnd);
     canvas.addEventListener('touchstart', handleStart, {passive: false}); canvas.addEventListener('touchmove', handleMove, {passive: false}); canvas.addEventListener('touchend', handleEnd);
 
-
     // --- 描画関数 ---
-
     function drawBambooRect(obj, isSource) {
         ctx.save();
         let transX = isSource ? obj.x : obj.pivotX; let transY = obj.y;
@@ -255,36 +239,20 @@ html_code = """
         let relX = isSource ? 0 : -w * 0.3; let relY = -h/2;
 
         if (isSource) {
-            // 上の竹
             let grd = ctx.createLinearGradient(0, -h/2, 0, h/2);
             grd.addColorStop(0, "#556b2f"); grd.addColorStop(1, "#2e3b1f");
             ctx.fillStyle = grd; ctx.fillRect(relX, relY, w, h);
             ctx.beginPath(); ctx.arc(0, 0, obj.handleRadius, 0, Math.PI*2);
             ctx.fillStyle = "#ff6b6b"; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke();
         } else {
-            // --- 下の竹（先端カットVer）---
-            
-            // 三角形の描画コードを削除し、純粋な竹の形のみ描画
-            
-            // 1. 水（クリッピング）
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(relX, relY, w, h); // シンプルな四角
-            ctx.clip();
+            // 先端カットVer
+            ctx.save(); ctx.beginPath(); ctx.rect(relX, relY, w, h); ctx.clip();
             let fillRate = Math.min(obj.waterMass / 250, 1.0); 
             let waterLevel = fillRate * h;
-            if (waterLevel > 0) { 
-                ctx.fillStyle = "rgba(100, 200, 255, 0.85)"; 
-                ctx.fillRect(relX, relY + h - waterLevel, w, waterLevel); 
-            }
+            if (waterLevel > 0) { ctx.fillStyle = "rgba(100, 200, 255, 0.85)"; ctx.fillRect(relX, relY + h - waterLevel, w, waterLevel); }
             ctx.restore();
-
-            // 2. 竹本体
-            ctx.fillStyle = "rgba(144, 238, 144, 0.2)"; 
-            ctx.fillRect(relX, relY, w, h);
-            ctx.strokeStyle = "#556b2f"; 
-            ctx.lineWidth = 3; 
-            ctx.strokeRect(relX, relY, w, h);
+            ctx.fillStyle = "rgba(144, 238, 144, 0.2)"; ctx.fillRect(relX, relY, w, h);
+            ctx.strokeStyle = "#556b2f"; ctx.lineWidth = 3; ctx.strokeRect(relX, relY, w, h);
         }
         ctx.restore();
     }
@@ -315,7 +283,6 @@ html_code = """
     function update() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // --- 床の水 ---
         if (floorWaterHeight > 0) {
             ctx.fillStyle = "rgba(0, 100, 200, 0.5)";
             ctx.fillRect(0, canvas.height - floorWaterHeight, canvas.width, floorWaterHeight);
@@ -323,7 +290,6 @@ html_code = """
 
         let amountVal = parseInt(amountSlider.value); let powerVal = parseInt(powerSlider.value);
 
-        // --- 1. 水の生成 ---
         if (Math.random() * 50 < amountVal * 2) { 
             let tipX = source.x + Math.cos(source.angle) * source.width;
             let tipY = source.y + Math.sin(source.angle) * source.width;
@@ -332,7 +298,6 @@ html_code = """
             particles.push({ x: tipX, y: tipY + (Math.random()*6-3), vx: velX, vy: velY, radius: 2 + Math.random() * 3, state: 'falling' });
         }
 
-        // --- 2. 竹の物理 ---
         let k = 0.02; let force = (bamboo.targetAngle - bamboo.angle) * k;
         let waterForce = bamboo.waterMass * 0.0003; 
         bamboo.velocity += force + waterForce; bamboo.velocity *= 0.98; bamboo.angle += bamboo.velocity;
@@ -343,7 +308,6 @@ html_code = """
         }
         if (bamboo.angle < bamboo.targetAngle) { bamboo.angle = bamboo.targetAngle; bamboo.velocity = 0; bamboo.isDumping = false; }
 
-        // --- 3. 粒子更新 ---
         let pivotX = bamboo.pivotX; let pivotY = bamboo.y;
         bamboo.waterMass = 0; 
         
@@ -357,16 +321,9 @@ html_code = """
                     let rx = p.x - pivotX; let ry = p.y - pivotY;
                     let localX = rx * Math.cos(-bamboo.angle) - ry * Math.sin(-bamboo.angle);
                     let localY = rx * Math.sin(-bamboo.angle) + ry * Math.cos(-bamboo.angle);
-                    
                     let tipStart = bamboo.width * 0.7; 
-                    
-                    // ★判定調整：ファンネルが無いので、竹の筒の内部に入るかどうかを判定
-                    // 少し「見えないファンネル」判定を残して、入りやすくするおもてなし仕様
-                    let invisibleFunnelW = 10; 
-                    let inBodyX = (localX > tipStart - 10 && localX < tipStart + 20); // 先端付近
-                    // 縦方向も筒の幅より少し甘く
+                    let inBodyX = (localX > tipStart - 10 && localX < tipStart + 20);
                     let inBodyY = (localY > -25 && localY < 25); 
-
                     if (inBodyX && inBodyY && p.vy > 0) { p.state = 'trapped'; p.vx = 0; p.vy = 0; }
                 }
 
@@ -379,7 +336,7 @@ html_code = """
                     }
                 }
                 if (p.y > canvas.height) { 
-                    floorWaterHeight = Math.min(floorWaterHeight + 0.2, 500); // 浸水上限アップ
+                    floorWaterHeight = Math.min(floorWaterHeight + 0.2, 500); 
                     particles.splice(i, 1); continue; 
                 }
             }
@@ -443,6 +400,5 @@ html_code = """
 </html>
 """
 
-# ★ここが重要！高さを「スマホ1画面分くらい（800px）」に制限する
-# これで「フレーム内スクロール」が発生し、Stickyヘッダーが機能する！
-components.html(html_code, height=800)
+# 高さを850くらいにして、フレーム内スクロールも維持しつつ、石が見える位置に！
+components.html(html_code, height=850)
