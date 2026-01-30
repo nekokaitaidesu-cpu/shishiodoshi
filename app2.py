@@ -28,6 +28,10 @@ st.markdown("""
         color: #2e3b1f !important; 
         margin-top: 100px;
     }
+    .stMarkdown p {
+        color: #595857 !important; /* ← ここにお好みの色！ */
+        font-family: "Yu Mincho", serif !important; /* フォントも強制！ */
+    }
     .stHtml { margin: 0 auto; }
     iframe { border: none; }
     </style>
