@@ -33,9 +33,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 無限カオスししおどし (物理演算・極💥) 🎋")
-st.write("受け石が少し軽くなって浮上するように！")
-st.write("さらに**「石 vs ひよこ」**の当たり判定も追加！回転する石に気をつけて😂")
+st.title("🎋 無限カオスししおどし (完結：ひよこ激突編🐣) 🎋")
+st.write("ひよこと受け石の当たり判定を修正！💥")
+st.write("回転する石に巻き込まれて**吹っ飛ぶひよこ**にご注意ください😂")
 
 # シミュレーター本体（HTML/JS）
 html_code = """
@@ -212,7 +212,6 @@ html_code = """
         handleRadius: 15
     };
 
-    // ★受け石（軽量化＆浮力強化）
     const basin = {
         x: canvas.width / 2 + 50,
         y: 650, 
@@ -223,8 +222,8 @@ html_code = """
         name: 'basin',
         vx: 0, vy: 0,
         angle: 0, vAngle: 0, 
-        mass: 8, // ★ 20 -> 8 に軽量化
-        buoyancyFactor: 0.05 // ★ 0.02 -> 0.05 にアップ
+        mass: 8, 
+        buoyancyFactor: 0.05 
     };
 
     let chicks = [];
@@ -237,7 +236,7 @@ html_code = """
             angle: 0, 
             wobbleOffset: Math.random() * 100,
             name: 'chick',
-            mass: 1, // ひよこの軽さ
+            mass: 1, 
             buoyancyFactor: 0.05
         };
     }
@@ -259,7 +258,6 @@ html_code = """
     }
     function getDist(x1, y1, x2, y2) { return Math.sqrt((x1-x2)**2 + (y1-y2)**2); }
 
-    // 座標回転ヘルパー (center X, center Y, point X, point Y, angle)
     function rotatePoint(cx, cy, x, y, angle) {
         let cos = Math.cos(angle), sin = Math.sin(angle);
         let nx = (cos * (x - cx)) + (sin * (y - cy)) + cx;
@@ -269,12 +267,14 @@ html_code = """
 
     function handleStart(e) {
         const pos = getPos(e);
+        // ひよこ
         for (let i = chicks.length - 1; i >= 0; i--) {
             let c = chicks[i];
             if (getDist(pos.x, pos.y, c.x, c.y) < c.radius * 1.5) {
                 dragTarget = c; dragOffsetX = pos.x - c.x; dragOffsetY = pos.y - c.y; return;
             }
         }
+        // 上のギミック
         if (getDist(pos.x, pos.y, source.x, source.y) < source.handleRadius + 15) { dragTarget = 'rotator'; return; }
         let srcCX = source.x + Math.cos(source.angle) * (source.width/2);
         let srcCY = source.y + Math.sin(source.angle) * (source.width/2);
@@ -364,7 +364,7 @@ html_code = """
             let visibleLevel = Math.min(basin.waterLevel, basin.maxLevel);
             let waterH = (visibleLevel / basin.maxLevel) * h;
             ctx.save();
-            ctx.rotate(-basin.angle); // 水面水平
+            ctx.rotate(-basin.angle); 
             ctx.fillStyle = "rgba(100, 150, 255, 0.8)";
             let waterTopY = (relY + h - waterH) * Math.cos(basin.angle);
             ctx.fillRect(-w, waterTopY, w*2, h*2);
@@ -404,7 +404,6 @@ html_code = """
                 obj.vy += gravity;
                 let objBottom = obj.y + (obj.radius || obj.height/2); 
                 
-                // 浮力
                 if (objBottom > waterSurfaceY) {
                     let depth = objBottom - waterSurfaceY;
                     let buoyancy = depth * obj.buoyancyFactor / obj.mass; 
@@ -430,66 +429,72 @@ html_code = """
         chicks.forEach(c => applyPhysics(c));
         applyPhysics(basin); 
 
-        // --- ★受け石 vs ひよこ の衝突判定 (常時ON) ---
-        // 石を回転した矩形として判定
+        // --- ★受け石 vs ひよこ の衝突判定 (修正版) ---
         chicks.forEach(c => {
-            if (dragTarget === c || dragTarget === basin) return; // 掴んでる時はスルー
+            if (dragTarget === c || dragTarget === basin) return; 
 
-            // ひよこを石のローカル座標へ変換
-            let localC = rotatePoint(basin.x, basin.y, c.x, c.y, -basin.angle);
+            // 1. ひよこを、石の中心を原点とした回転前の座標系に変換
+            // rotatePointは絶対座標を返すので、そこからbasin.x/yを引いて「相対座標」にする
+            let unrotatedP = rotatePoint(basin.x, basin.y, c.x, c.y, -basin.angle);
+            let localCX = unrotatedP.x - basin.x;
+            let localCY = unrotatedP.y - basin.y;
+
             let halfW = basin.width / 2;
             let halfH = basin.height / 2;
 
-            // ローカルAABBと円の衝突判定
-            // 矩形上の最近接点を求める
-            let closestX = Math.max(-halfW, Math.min(localC.x, halfW));
-            let closestY = Math.max(-halfH, Math.min(localC.y, halfH));
+            // 2. 矩形（AABB）と円の衝突判定
+            // ひよこの中心に最も近い矩形上の点を見つける
+            let closestX = Math.max(-halfW, Math.min(localCX, halfW));
+            let closestY = Math.max(-halfH, Math.min(localCY, halfH));
 
-            let distX = localC.x - closestX;
-            let distY = localC.y - closestY;
+            let distX = localCX - closestX;
+            let distY = localCY - closestY;
             let distanceSquared = (distX * distX) + (distY * distY);
 
-            // 衝突！
+            // 3. 衝突！
             if (distanceSquared < (c.radius * c.radius)) {
                 let distance = Math.sqrt(distanceSquared);
                 let overlap = c.radius - distance;
                 
-                // 法線（ローカル）
+                // 法線（ローカル）- 矩形から外へ向かうベクトル
                 let localNx = (distance > 0) ? distX / distance : 0; 
                 let localNy = (distance > 0) ? distY / distance : 1; 
-                // もし完全に内部に入り込んだら上に押し出す
+                // もし完全に内部に入り込んだら（distance=0）、とりあえず上に押し出す
                 if (distance === 0) localNy = -1;
 
-                // 法線をワールド座標へ戻す
+                // 4. 法線をワールド座標へ戻す（回転させる）
+                // ベクトルなのでrotatePointのcx, cyは0
                 let worldNorm = rotatePoint(0, 0, localNx, localNy, basin.angle);
 
-                // 反発処理（ひよこは軽いのでよく飛ぶ）
-                // 質量比で押し出し量を分担
+                // 5. 反発処理
                 let totalMass = c.mass + basin.mass;
-                let m1 = c.mass / totalMass; // ひよこの重み比率（小）
-                let m2 = basin.mass / totalMass; // 石の重み比率（大）
+                let m1 = c.mass / totalMass; // ひよこの重み比率
+                let m2 = basin.mass / totalMass; // 石の重み比率
 
-                // 位置修正
-                c.x += worldNorm.x * overlap * m2; // ひよこがいっぱい動く
-                c.y += worldNorm.y * overlap * m2;
-                basin.x -= worldNorm.x * overlap * m1; // 石は少し動く
+                // 位置修正 (めり込み解消)
+                c.x += worldNorm.x * overlap * m2 * 1.1; // ひよこを動かす（少し多めに）
+                c.y += worldNorm.y * overlap * m2 * 1.1;
+                basin.x -= worldNorm.x * overlap * m1; // 石も少し動く
                 basin.y -= worldNorm.y * overlap * m1;
 
-                // 速度変化 (簡易バウンス)
-                let restitution = 0.5; // 反発係数
-                // ひよこを弾き飛ばす
+                // 速度変化 (バウンス)
+                let restitution = 0.5;
+                
+                // 衝撃を速度に加算
+                // ひよこは吹っ飛ぶ
                 c.vx += worldNorm.x * 2; 
                 c.vy += worldNorm.y * 2;
-                // 石にも少し衝撃
-                basin.vx -= worldNorm.x * 0.5;
-                basin.vy -= worldNorm.y * 0.5;
-                // 石に回転力を与える（中心からズレている場合）
-                basin.vAngle += (localC.x * localNy - localC.y * localNx) * 0.005;
+                
+                // 石は少し揺れる & 回転力が加わる
+                basin.vx -= worldNorm.x * 0.2;
+                basin.vy -= worldNorm.y * 0.2;
+                // トルク計算: 衝突点と重心のズレの外積的なもの
+                basin.vAngle += (localCX * localNy - localCY * localNx) * 0.005;
             }
         });
 
 
-        // ひよこ衝突（仲間割れスイッチ）
+        // ひよこ衝突（仲間割れ）
         let collisionEnabled = collisionToggle.checked;
         if (collisionEnabled) {
              for (let i = 0; i < chicks.length; i++) { for (let j = i + 1; j < chicks.length; j++) { let c1 = chicks[i]; let c2 = chicks[j]; let dx = c2.x - c1.x; let dy = c2.y - c1.y; let dist = Math.sqrt(dx * dx + dy * dy); let minDist = c1.radius + c2.radius; if (dist < minDist) { let angle = Math.atan2(dy, dx); let overlap = minDist - dist; let moveX = Math.cos(angle) * overlap * 0.5; let moveY = Math.sin(angle) * overlap * 0.5; if (dragTarget !== c1) { c1.x -= moveX; c1.y -= moveY; } if (dragTarget !== c2) { c2.x += moveX; c2.y += moveY; } let vxRel = c2.vx - c1.vx; let vyRel = c2.vy - c1.vy; let nx = dx / dist; let ny = dy / dist; let velAlongNormal = vxRel * nx + vyRel * ny; if (velAlongNormal < 0) { let restitution = 0.8; let jVal = -(1 + restitution) * velAlongNormal; jVal /= 2; let impulseX = jVal * nx; let impulseY = jVal * ny; if (dragTarget !== c1) { c1.vx -= impulseX; c1.vy -= impulseY; } if (dragTarget !== c2) { c2.vx += impulseX; c2.vy += impulseY; } } } } }
@@ -546,6 +551,7 @@ html_code = """
             if (p.state !== 'trapped') { ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = "rgba(100, 200, 255, 0.9)"; ctx.fill(); }
         }
         
+        // 溢れ演出
         if (basin.waterLevel >= basin.maxLevel || Math.abs(basin.angle) > 0.5) {
             if (basin.waterLevel > 0 && Math.random() < 0.3) { 
                 basin.waterLevel -= 0.5; 
