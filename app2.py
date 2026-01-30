@@ -8,17 +8,16 @@ st.set_page_config(
     layout="wide"
 )
 
-# ★スタイル定義（ページ全体は元の落ち着いた色に戻す）
+# スタイル定義
 st.markdown("""
     <style>
     body {
-        background-color: #f4f1ea; /* 元の白っぽい色 */
+        background-color: #f4f1ea;
         color: #595857;
         font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
         margin: 0;
     }
     .stApp {
-        /* 背景画像は削除して単色に */
         background-image: none;
         background-color: #f4f1ea;
     }
@@ -34,9 +33,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 無限カオスししおどし (完成形✨) 🎋")
-st.write("背景画像を**シミュレーション画面の中だけ**に適用したっち！🍄")
-st.write("まるで動く絵画の中で、ひよこたちがカオスな戦いを繰り広げる……！")
+st.title("🎋 無限カオスししおどし (スイッチ連動Ver🐣) 🎋")
+st.write("「💥仲間割れ」スイッチを入れると、**受け石の物理演算も解禁**されるよ！")
+st.write("OFFの時は、ちゃんと良い子にして水を受け止めてくれるはず……たぶん🍄")
 
 # シミュレーター本体（HTML/JS）
 html_code = """
@@ -53,12 +52,11 @@ html_code = """
         height: auto;
     }
     canvas {
-        background-color: transparent; /* キャンバス自体は透明のまま */
+        background-color: transparent; 
         display: block;
         margin: 0 auto;
         cursor: grab;
         touch-action: none;
-        /* 枠線はコンテナにつけるので削除 */
         border: none; 
     }
     canvas:active { cursor: grabbing; }
@@ -70,7 +68,7 @@ html_code = """
         width: 100%;
         box-sizing: border-box;
         padding: 10px 15px;
-        background: rgba(255,255,255,0.95); /* コントロールは見やすく白背景 */
+        background: rgba(255,255,255,0.95);
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         border-bottom: 1px solid #ccc;
         display: flex;
@@ -138,21 +136,17 @@ html_code = """
         transition: opacity 0.1s; 
     }
     
-    /* ★ここに背景画像を設定！キャンバスの入れ物 */
     .container { 
         position: relative;
-        /* GitHubのRaw画像URLを指定 */
         background-image: url("https://raw.githubusercontent.com/nekokaitaidesu-cpu/shishiodoshi/main/image1.jpg");
-        background-size: cover; /* 枠いっぱいに広げる */
-        background-position: center bottom; /* 下基準で合わせる */
-        
-        /* ゲーム画面っぽく装飾 */
-        border-radius: 15px; /* 角丸 */
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2); /* 影をつけて浮かせる */
-        margin: 20px auto; /* 中央寄せと余白 */
-        max-width: 95%; /* スマホではみ出さないように */
-        overflow: hidden; /* はみ出した水をカット */
-        border: 3px solid #556b2f; /* 和風な枠線 */
+        background-size: cover; 
+        background-position: center bottom;
+        border-radius: 15px; 
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
+        margin: 20px auto; 
+        max-width: 95%; 
+        overflow: hidden; 
+        border: 3px solid #556b2f; 
     }
 </style>
 </head>
@@ -195,12 +189,10 @@ html_code = """
     const collisionToggle = document.getElementById('collisionToggle');
 
     function resizeCanvas() {
-        // キャンバスのサイズはコンテナに合わせる
         canvas.width = canvas.parentElement.clientWidth;
         canvas.height = 900; 
     }
     resizeCanvas();
-    // ウィンドウサイズ変更時に再調整
     window.addEventListener('resize', resizeCanvas);
 
     const gravity = 0.15;
@@ -287,21 +279,18 @@ html_code = """
 
     function handleStart(e) {
         const pos = getPos(e);
-        // ひよこ
         for (let i = chicks.length - 1; i >= 0; i--) {
             let c = chicks[i];
             if (getDist(pos.x, pos.y, c.x, c.y) < c.radius * 1.5) {
                 dragTarget = c; dragOffsetX = pos.x - c.x; dragOffsetY = pos.y - c.y; return;
             }
         }
-        // 上のギミック
         if (getDist(pos.x, pos.y, source.x, source.y) < source.handleRadius + 15) { dragTarget = 'rotator'; return; }
         let srcCX = source.x + Math.cos(source.angle) * (source.width/2);
         let srcCY = source.y + Math.sin(source.angle) * (source.width/2);
         if (getDist(pos.x, pos.y, srcCX, srcCY) < 60) { dragTarget = source; dragOffsetX = pos.x - source.x; dragOffsetY = pos.y - source.y; return; }
         if (getDist(pos.x, pos.y, bamboo.pivotX, bamboo.y) < 70) { dragTarget = bamboo; dragOffsetX = pos.x - bamboo.pivotX; dragOffsetY = pos.y - bamboo.y; return; }
         
-        // 受け石判定
         if (getDist(pos.x, pos.y, basin.x, basin.y) < Math.max(basin.width, basin.height) / 1.5) {
             dragTarget = basin;
             dragOffsetX = pos.x - basin.x; dragOffsetY = pos.y - basin.y;
@@ -419,6 +408,8 @@ html_code = """
         }
 
         // --- 物理計算 ---
+        let collisionEnabled = collisionToggle.checked;
+
         function applyPhysics(obj) {
             if (dragTarget !== obj) {
                 obj.vy += gravity;
@@ -442,61 +433,71 @@ html_code = """
 
                 obj.x += obj.vx;
                 obj.y += obj.vy;
-                if(obj.vAngle !== undefined) obj.angle += obj.vAngle;
+                
+                // 回転 (スイッチONの時のみ)
+                if (obj.vAngle !== undefined) {
+                    if (collisionEnabled) {
+                        obj.angle += obj.vAngle;
+                    } else {
+                        // OFFなら水平に戻ろうとする
+                        obj.angle *= 0.9; 
+                        obj.vAngle = 0;
+                    }
+                }
             }
         }
 
         chicks.forEach(c => applyPhysics(c));
         applyPhysics(basin); 
 
-        // --- ★受け石 vs ひよこ の衝突判定 ---
-        chicks.forEach(c => {
-            if (dragTarget === c || dragTarget === basin) return; 
+        // --- ★受け石 vs ひよこ の衝突判定 (スイッチONのみ) ---
+        if (collisionEnabled) {
+            chicks.forEach(c => {
+                if (dragTarget === c || dragTarget === basin) return; 
 
-            let unrotatedP = rotatePoint(basin.x, basin.y, c.x, c.y, -basin.angle);
-            let localCX = unrotatedP.x - basin.x;
-            let localCY = unrotatedP.y - basin.y;
+                let unrotatedP = rotatePoint(basin.x, basin.y, c.x, c.y, -basin.angle);
+                let localCX = unrotatedP.x - basin.x;
+                let localCY = unrotatedP.y - basin.y;
 
-            let halfW = basin.width / 2;
-            let halfH = basin.height / 2;
+                let halfW = basin.width / 2;
+                let halfH = basin.height / 2;
 
-            let closestX = Math.max(-halfW, Math.min(localCX, halfW));
-            let closestY = Math.max(-halfH, Math.min(localCY, halfH));
+                let closestX = Math.max(-halfW, Math.min(localCX, halfW));
+                let closestY = Math.max(-halfH, Math.min(localCY, halfH));
 
-            let distX = localCX - closestX;
-            let distY = localCY - closestY;
-            let distanceSquared = (distX * distX) + (distY * distY);
+                let distX = localCX - closestX;
+                let distY = localCY - closestY;
+                let distanceSquared = (distX * distX) + (distY * distY);
 
-            if (distanceSquared < (c.radius * c.radius)) {
-                let distance = Math.sqrt(distanceSquared);
-                let overlap = c.radius - distance;
-                
-                let localNx = (distance > 0) ? distX / distance : 0; 
-                let localNy = (distance > 0) ? distY / distance : 1; 
-                if (distance === 0) localNy = -1;
+                if (distanceSquared < (c.radius * c.radius)) {
+                    let distance = Math.sqrt(distanceSquared);
+                    let overlap = c.radius - distance;
+                    
+                    let localNx = (distance > 0) ? distX / distance : 0; 
+                    let localNy = (distance > 0) ? distY / distance : 1; 
+                    if (distance === 0) localNy = -1;
 
-                let worldNorm = rotatePoint(0, 0, localNx, localNy, basin.angle);
+                    let worldNorm = rotatePoint(0, 0, localNx, localNy, basin.angle);
 
-                let m1 = c.mass / (c.mass + basin.mass); 
-                let m2 = basin.mass / (c.mass + basin.mass); 
+                    let m1 = c.mass / (c.mass + basin.mass); 
+                    let m2 = basin.mass / (c.mass + basin.mass); 
 
-                c.x += worldNorm.x * overlap * m2 * 1.1; 
-                c.y += worldNorm.y * overlap * m2 * 1.1;
-                basin.x -= worldNorm.x * overlap * m1; 
-                basin.y -= worldNorm.y * overlap * m1;
+                    c.x += worldNorm.x * overlap * m2 * 1.1; 
+                    c.y += worldNorm.y * overlap * m2 * 1.1;
+                    basin.x -= worldNorm.x * overlap * m1; 
+                    basin.y -= worldNorm.y * overlap * m1;
 
-                c.vx += worldNorm.x * 2; 
-                c.vy += worldNorm.y * 2;
-                
-                basin.vx -= worldNorm.x * 0.2;
-                basin.vy -= worldNorm.y * 0.2;
-                basin.vAngle += (localCX * localNy - localCY * localNx) * 0.005;
-            }
-        });
-
+                    c.vx += worldNorm.x * 2; 
+                    c.vy += worldNorm.y * 2;
+                    
+                    basin.vx -= worldNorm.x * 0.2;
+                    basin.vy -= worldNorm.y * 0.2;
+                    basin.vAngle += (localCX * localNy - localCY * localNx) * 0.005;
+                }
+            });
+        }
 
         // ひよこ衝突（仲間割れ）
-        let collisionEnabled = collisionToggle.checked;
         if (collisionEnabled) {
              for (let i = 0; i < chicks.length; i++) { for (let j = i + 1; j < chicks.length; j++) { let c1 = chicks[i]; let c2 = chicks[j]; let dx = c2.x - c1.x; let dy = c2.y - c1.y; let dist = Math.sqrt(dx * dx + dy * dy); let minDist = c1.radius + c2.radius; if (dist < minDist) { let angle = Math.atan2(dy, dx); let overlap = minDist - dist; let moveX = Math.cos(angle) * overlap * 0.5; let moveY = Math.sin(angle) * overlap * 0.5; if (dragTarget !== c1) { c1.x -= moveX; c1.y -= moveY; } if (dragTarget !== c2) { c2.x += moveX; c2.y += moveY; } let vxRel = c2.vx - c1.vx; let vyRel = c2.vy - c1.vy; let nx = dx / dist; let ny = dy / dist; let velAlongNormal = vxRel * nx + vyRel * ny; if (velAlongNormal < 0) { let restitution = 0.8; let jVal = -(1 + restitution) * velAlongNormal; jVal /= 2; let impulseX = jVal * nx; let impulseY = jVal * ny; if (dragTarget !== c1) { c1.vx -= impulseX; c1.vy -= impulseY; } if (dragTarget !== c2) { c2.vx += impulseX; c2.vy += impulseY; } } } } }
         }
@@ -529,7 +530,7 @@ html_code = """
                     if (p.vy > 0 && relP.y < by + 30) { 
                          if (basin.waterLevel < basin.maxLevel && Math.abs(basin.angle) < 0.5) { basin.waterLevel += 0.5; particles.splice(i, 1); continue; } else { p.state = 'overflow'; }
                     } else if (p.vy < 0 && relP.y > by + basin.height - 30) { 
-                        if (dragTarget !== basin) {
+                        if (dragTarget !== basin && collisionEnabled) { // ★スイッチON時のみ回転力
                             let torque = (relP.x - basin.x) * p.vy * 0.001; basin.vAngle += torque; basin.vy += p.vy * 0.05; 
                         }
                     }
