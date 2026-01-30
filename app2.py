@@ -1,6 +1,5 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import base64
 
 # ページ設定
 st.set_page_config(
@@ -9,44 +8,19 @@ st.set_page_config(
     layout="wide"
 )
 
-# ★背景画像の設定関数
-def set_bg_url(url):
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url("{url}");
-            background-attachment: fixed;
-            background-size: cover;
-            background-position: center;
-        }}
-        /* 文字が見えやすいように少し白を重ねる */
-        .stApp::before {{
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.6); /* 白の透過 */
-            z-index: -1;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-set_bg_url("https://raw.githubusercontent.com/nekokaitaidesu-cpu/shishiodoshi/main/image1.jpg")
-
-# スタイル定義（背景以外）
+# ★スタイル定義（ページ全体は元の落ち着いた色に戻す）
 st.markdown("""
     <style>
     body {
+        background-color: #f4f1ea; /* 元の白っぽい色 */
         color: #595857;
         font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
         margin: 0;
-        background-color: transparent; /* body背景は透明に */
+    }
+    .stApp {
+        /* 背景画像は削除して単色に */
+        background-image: none;
+        background-color: #f4f1ea;
     }
     h1 {
         text-align: center;
@@ -54,20 +28,17 @@ st.markdown("""
         padding-bottom: 10px;
         color: #2e3b1f;
         margin-top: 100px;
-        text-shadow: 2px 2px 0px #fff; /* 文字を見やすく */
     }
     .stHtml { margin: 0 auto; }
     iframe { border: none; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 無限カオスししおどし (背景追加Ver🌸) 🎋")
-st.write("背景がついに実装されたっち！")
-st.write("やんわりした雰囲気の中で、**仁義なきひよこバトル**を楽しんでね😂")
+st.title("🎋 無限カオスししおどし (完成形✨) 🎋")
+st.write("背景画像を**シミュレーション画面の中だけ**に適用したっち！🍄")
+st.write("まるで動く絵画の中で、ひよこたちがカオスな戦いを繰り広げる……！")
 
-# --- 以下、シミュレーター本体（前回と同じ） ---
-# （変更なしですが、念のためフルコード載せますか？今回は上のCSS部分だけの変更でOKだよ！）
-
+# シミュレーター本体（HTML/JS）
 html_code = """
 <!DOCTYPE html>
 <html>
@@ -77,17 +48,18 @@ html_code = """
     body { 
         margin: 0; 
         font-family: sans-serif; 
-        background-color: transparent; /* 背景透明 */
+        background-color: transparent;
         overflow-y: auto; 
         height: auto;
     }
     canvas {
-        background-color: transparent; /* キャンバスも透明 */
+        background-color: transparent; /* キャンバス自体は透明のまま */
         display: block;
         margin: 0 auto;
         cursor: grab;
         touch-action: none;
-        border: 2px dashed rgba(107, 142, 35, 0.5); /* 枠線を少し濃く */
+        /* 枠線はコンテナにつけるので削除 */
+        border: none; 
     }
     canvas:active { cursor: grabbing; }
     
@@ -98,8 +70,7 @@ html_code = """
         width: 100%;
         box-sizing: border-box;
         padding: 10px 15px;
-        background: rgba(255,255,255,0.85); /* 半透明にして背景を透かす */
-        backdrop-filter: blur(5px); /* すりガラス効果 */
+        background: rgba(255,255,255,0.95); /* コントロールは見やすく白背景 */
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         border-bottom: 1px solid #ccc;
         display: flex;
@@ -166,7 +137,23 @@ html_code = """
         z-index: 50;
         transition: opacity 0.1s; 
     }
-    .container { position: relative; }
+    
+    /* ★ここに背景画像を設定！キャンバスの入れ物 */
+    .container { 
+        position: relative;
+        /* GitHubのRaw画像URLを指定 */
+        background-image: url("https://raw.githubusercontent.com/nekokaitaidesu-cpu/shishiodoshi/main/image1.jpg");
+        background-size: cover; /* 枠いっぱいに広げる */
+        background-position: center bottom; /* 下基準で合わせる */
+        
+        /* ゲーム画面っぽく装飾 */
+        border-radius: 15px; /* 角丸 */
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2); /* 影をつけて浮かせる */
+        margin: 20px auto; /* 中央寄せと余白 */
+        max-width: 95%; /* スマホではみ出さないように */
+        overflow: hidden; /* はみ出した水をカット */
+        border: 3px solid #556b2f; /* 和風な枠線 */
+    }
 </style>
 </head>
 <body>
@@ -208,10 +195,12 @@ html_code = """
     const collisionToggle = document.getElementById('collisionToggle');
 
     function resizeCanvas() {
-        canvas.width = window.innerWidth;
+        // キャンバスのサイズはコンテナに合わせる
+        canvas.width = canvas.parentElement.clientWidth;
         canvas.height = 900; 
     }
     resizeCanvas();
+    // ウィンドウサイズ変更時に再調整
     window.addEventListener('resize', resizeCanvas);
 
     const gravity = 0.15;
@@ -243,7 +232,6 @@ html_code = """
         handleRadius: 15
     };
 
-    // ★受け石
     const basin = {
         x: canvas.width / 2 + 50,
         y: 650, 
@@ -299,18 +287,21 @@ html_code = """
 
     function handleStart(e) {
         const pos = getPos(e);
+        // ひよこ
         for (let i = chicks.length - 1; i >= 0; i--) {
             let c = chicks[i];
             if (getDist(pos.x, pos.y, c.x, c.y) < c.radius * 1.5) {
                 dragTarget = c; dragOffsetX = pos.x - c.x; dragOffsetY = pos.y - c.y; return;
             }
         }
+        // 上のギミック
         if (getDist(pos.x, pos.y, source.x, source.y) < source.handleRadius + 15) { dragTarget = 'rotator'; return; }
         let srcCX = source.x + Math.cos(source.angle) * (source.width/2);
         let srcCY = source.y + Math.sin(source.angle) * (source.width/2);
         if (getDist(pos.x, pos.y, srcCX, srcCY) < 60) { dragTarget = source; dragOffsetX = pos.x - source.x; dragOffsetY = pos.y - source.y; return; }
         if (getDist(pos.x, pos.y, bamboo.pivotX, bamboo.y) < 70) { dragTarget = bamboo; dragOffsetX = pos.x - bamboo.pivotX; dragOffsetY = pos.y - bamboo.y; return; }
         
+        // 受け石判定
         if (getDist(pos.x, pos.y, basin.x, basin.y) < Math.max(basin.width, basin.height) / 1.5) {
             dragTarget = basin;
             dragOffsetX = pos.x - basin.x; dragOffsetY = pos.y - basin.y;
@@ -458,7 +449,7 @@ html_code = """
         chicks.forEach(c => applyPhysics(c));
         applyPhysics(basin); 
 
-        // --- ★受け石 vs ひよこ ---
+        // --- ★受け石 vs ひよこ の衝突判定 ---
         chicks.forEach(c => {
             if (dragTarget === c || dragTarget === basin) return; 
 
@@ -486,9 +477,8 @@ html_code = """
 
                 let worldNorm = rotatePoint(0, 0, localNx, localNy, basin.angle);
 
-                let totalMass = c.mass + basin.mass;
-                let m1 = c.mass / totalMass; 
-                let m2 = basin.mass / totalMass; 
+                let m1 = c.mass / (c.mass + basin.mass); 
+                let m2 = basin.mass / (c.mass + basin.mass); 
 
                 c.x += worldNorm.x * overlap * m2 * 1.1; 
                 c.y += worldNorm.y * overlap * m2 * 1.1;
@@ -504,7 +494,8 @@ html_code = """
             }
         });
 
-        // ひよこ衝突
+
+        // ひよこ衝突（仲間割れ）
         let collisionEnabled = collisionToggle.checked;
         if (collisionEnabled) {
              for (let i = 0; i < chicks.length; i++) { for (let j = i + 1; j < chicks.length; j++) { let c1 = chicks[i]; let c2 = chicks[j]; let dx = c2.x - c1.x; let dy = c2.y - c1.y; let dist = Math.sqrt(dx * dx + dy * dy); let minDist = c1.radius + c2.radius; if (dist < minDist) { let angle = Math.atan2(dy, dx); let overlap = minDist - dist; let moveX = Math.cos(angle) * overlap * 0.5; let moveY = Math.sin(angle) * overlap * 0.5; if (dragTarget !== c1) { c1.x -= moveX; c1.y -= moveY; } if (dragTarget !== c2) { c2.x += moveX; c2.y += moveY; } let vxRel = c2.vx - c1.vx; let vyRel = c2.vy - c1.vy; let nx = dx / dist; let ny = dy / dist; let velAlongNormal = vxRel * nx + vyRel * ny; if (velAlongNormal < 0) { let restitution = 0.8; let jVal = -(1 + restitution) * velAlongNormal; jVal /= 2; let impulseX = jVal * nx; let impulseY = jVal * ny; if (dragTarget !== c1) { c1.vx -= impulseX; c1.vy -= impulseY; } if (dragTarget !== c2) { c2.vx += impulseX; c2.vy += impulseY; } } } } }
@@ -531,7 +522,7 @@ html_code = """
                     if (inBodyX && inBodyY && p.vy > 0) { p.state = 'trapped'; p.vx = 0; p.vy = 0; }
                 }
 
-                // 受け石判定
+                // 受け石判定（回転考慮）
                 let relP = rotatePoint(basin.x, basin.y, p.x, p.y, -basin.angle);
                 let bx = basin.x - basin.width/2; let by = basin.y - basin.height/2;
                 if (relP.y > by && relP.y < by + basin.height && relP.x > bx + 10 && relP.x < bx + basin.width - 10) {
