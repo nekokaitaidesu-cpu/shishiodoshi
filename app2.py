@@ -13,7 +13,7 @@ st.markdown("""
     <style>
     body {
         background-color: #f4f1ea;
-        color: #595857;
+        color: #2e3b1f !important;
         font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
         margin: 0;
     }
