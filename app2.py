@@ -33,9 +33,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 無限カオスししおどし (with 🐣) 🎋")
-st.write("床に**「ひよこ」**を放ったっち！🐣")
-st.write("水が溜まるとプカプカ浮いてくるよ！かわいがってあげてね😂")
+st.title("🎋 無限カオスししおどし (ひよこ祭り🐣) 🎋")
+st.write("スライダーで**ひよこを量産**できるようになったっち！🐣🐣🐣")
+st.write("水没した床でひしめき合う姿に癒されてね（？）")
 
 # シミュレーター本体（HTML/JS）
 html_code = """
@@ -80,7 +80,7 @@ html_code = """
     .control-group {
         display: flex;
         align-items: center;
-        min-width: 140px;
+        min-width: 120px;
         flex: 1;
     }
     label { font-size: 0.85rem; font-weight: bold; color: #556b2f; margin-right: 5px; white-space: nowrap; }
@@ -119,6 +119,10 @@ html_code = """
         <label>🚀勢い</label>
         <input type="range" id="powerSlider" min="1" max="30" value="5">
     </div>
+    <div class="control-group">
+        <label>🐣ひよこ</label>
+        <input type="range" id="chickSlider" min="0" max="30" value="1">
+    </div>
 </div>
 
 <div class="container">
@@ -132,6 +136,7 @@ html_code = """
     const soundText = document.getElementById('sound-text');
     const amountSlider = document.getElementById('amountSlider');
     const powerSlider = document.getElementById('powerSlider');
+    const chickSlider = document.getElementById('chickSlider');
 
     function resizeCanvas() {
         canvas.width = window.innerWidth;
@@ -142,7 +147,7 @@ html_code = """
 
     const gravity = 0.15;
 
-    // --- オブジェクト定義 ---
+    // --- オブジェクト ---
 
     const bamboo = {
         x: canvas.width / 2 + 20, 
@@ -180,16 +185,26 @@ html_code = """
         name: 'basin'
     };
 
-    // ★新登場！ひよこオブジェクト🐣
-    const chick = {
-        x: canvas.width / 2 - 100, // 最初はちょっと左に
-        y: 850, // 床に置く
-        vx: 0,
-        vy: 0,
-        radius: 20, // 大きさ
-        angle: 0, // 傾き（ゆらゆら用）
-        name: 'chick'
-    };
+    // ★ひよこ管理配列🐣
+    let chicks = [];
+
+    // ひよこクラス的な生成関数
+    function createChick() {
+        return {
+            x: Math.random() * (canvas.width - 40) + 20, // ランダムな位置
+            y: 0, // 上から降ってくる
+            vx: 0,
+            vy: 0,
+            radius: 20, 
+            angle: 0, 
+            colorMain: "#FFEB3B", // 色味を微妙に変えても面白いけど今回は統一
+            wobbleOffset: Math.random() * 100, // 揺れの個体差
+            name: 'chick'
+        };
+    }
+
+    // 初期ひよこ1匹
+    chicks.push({ ...createChick(), y: 850 }); // 最初の子は床に
 
     let particles = [];
     let floorWaterHeight = 0; 
@@ -209,8 +224,17 @@ html_code = """
 
     function handleStart(e) {
         const pos = getPos(e);
-        // 判定順：ひよこ -> ハンドル -> ソース -> 竹 -> 受け石 (ひよこ最優先！)
-        if (getDist(pos.x, pos.y, chick.x, chick.y) < chick.radius * 1.5) { dragTarget = chick; dragOffsetX = pos.x - chick.x; dragOffsetY = pos.y - chick.y; return; }
+        
+        // ★ひよこ判定（配列を逆順にチェックして、手前のものから掴む）
+        for (let i = chicks.length - 1; i >= 0; i--) {
+            let c = chicks[i];
+            if (getDist(pos.x, pos.y, c.x, c.y) < c.radius * 1.5) {
+                dragTarget = c; 
+                dragOffsetX = pos.x - c.x; 
+                dragOffsetY = pos.y - c.y; 
+                return;
+            }
+        }
 
         if (getDist(pos.x, pos.y, source.x, source.y) < source.handleRadius + 15) { dragTarget = 'rotator'; return; }
         
@@ -227,7 +251,14 @@ html_code = """
     }
     function handleMove(e) {
         if (!dragTarget) return; e.preventDefault(); const pos = getPos(e);
-        if (dragTarget === 'rotator') { 
+        
+        // ターゲットがひよこ（nameプロパティで判定）
+        if (dragTarget.name === 'chick') {
+            dragTarget.x = pos.x - dragOffsetX;
+            dragTarget.y = pos.y - dragOffsetY;
+            dragTarget.vx = 0; dragTarget.vy = 0;
+        }
+        else if (dragTarget === 'rotator') { 
             let dx = pos.x - source.x; let dy = pos.y - source.y; source.angle = Math.atan2(dy, dx); 
         } else if (dragTarget === source) { 
             source.x = pos.x - dragOffsetX; source.y = pos.y - dragOffsetY; 
@@ -236,11 +267,6 @@ html_code = """
             let offset = bamboo.x - bamboo.pivotX; bamboo.pivotX = newPivotX; bamboo.y = newY; bamboo.x = newPivotX + offset; 
         } else if (dragTarget === basin) {
             basin.x = pos.x - dragOffsetX; basin.y = pos.y - dragOffsetY;
-        } else if (dragTarget === chick) {
-            // ひよこを掴んで移動
-            chick.x = pos.x - dragOffsetX;
-            chick.y = pos.y - dragOffsetY;
-            chick.vx = 0; chick.vy = 0; // 掴んでる間は物理リセット
         }
     }
     function handleEnd(e) { dragTarget = null; }
@@ -250,43 +276,37 @@ html_code = """
 
     // --- 描画関数 ---
     
-    // ひよこ描画🐣
-    function drawChick() {
+    // ひよこ描画（個体ごと）
+    function drawOneChick(c) {
         ctx.save();
-        ctx.translate(chick.x, chick.y);
-        // 水に浮いてる感を出すために少し揺らす
-        let wobble = Math.sin(Date.now() / 200) * 0.1;
-        ctx.rotate(chick.angle + wobble);
+        ctx.translate(c.x, c.y);
+        let wobble = Math.sin((Date.now() + c.wobbleOffset) / 200) * 0.1;
+        ctx.rotate(c.angle + wobble);
 
-        // 体（黄色い丸）
         ctx.beginPath();
-        ctx.arc(0, 0, chick.radius, 0, Math.PI * 2);
-        ctx.fillStyle = "#FFEB3B"; // 黄色
+        ctx.arc(0, 0, c.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "#FFEB3B"; 
         ctx.fill();
         ctx.strokeStyle = "#FBC02D";
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // 目（黒点）
-        ctx.beginPath();
-        ctx.arc(8, -5, 2, 0, Math.PI * 2); // 右目
-        ctx.fillStyle = "#000";
-        ctx.fill();
+        // 顔の向き（速度に合わせてちょっと見る方向変えるとかわいい）
+        let faceDir = (c.vx > 0.5) ? 1 : (c.vx < -0.5) ? -1 : 1;
         
-        // くちばし（オレンジ三角）
-        ctx.beginPath();
-        ctx.moveTo(15, 0);
-        ctx.lineTo(22, 3);
-        ctx.lineTo(15, 6);
-        ctx.fillStyle = "#FF9800";
-        ctx.fill();
+        ctx.save();
+        ctx.scale(faceDir, 1); // 左右反転
 
-        // 羽（ちょっと濃い黄色）
-        ctx.beginPath();
-        ctx.ellipse(-5, 5, 8, 5, 0.5, 0, Math.PI * 2);
-        ctx.fillStyle = "#FDD835";
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(8, -5, 2, 0, Math.PI * 2); 
+        ctx.fillStyle = "#000"; ctx.fill();
+        
+        ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(22, 3); ctx.lineTo(15, 6);
+        ctx.fillStyle = "#FF9800"; ctx.fill();
 
+        ctx.beginPath(); ctx.ellipse(-5, 5, 8, 5, 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#FDD835"; ctx.fill();
+        
+        ctx.restore();
         ctx.restore();
     }
 
@@ -304,7 +324,6 @@ html_code = """
             ctx.beginPath(); ctx.arc(0, 0, obj.handleRadius, 0, Math.PI*2);
             ctx.fillStyle = "#ff6b6b"; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke();
         } else {
-            // 先端カットVer
             ctx.save(); ctx.beginPath(); ctx.rect(relX, relY, w, h); ctx.clip();
             let fillRate = Math.min(obj.waterMass / 250, 1.0); 
             let waterLevel = fillRate * h;
@@ -339,54 +358,58 @@ html_code = """
     function update() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
+        // --- ひよこの数調整 ---
+        let targetChickCount = parseInt(chickSlider.value);
+        if (chicks.length < targetChickCount) {
+            // 足りなければ足す
+            if (Math.random() < 0.1) { // 一気に増えすぎないように少しずつ
+                chicks.push(createChick());
+            }
+        } else if (chicks.length > targetChickCount) {
+            // 多すぎれば減らす（古い順）
+            chicks.shift();
+        }
+
         // --- 床の水 ---
-        let waterSurfaceY = canvas.height - floorWaterHeight; // 水面のY座標
+        let waterSurfaceY = canvas.height - floorWaterHeight; 
         if (floorWaterHeight > 0) {
             ctx.fillStyle = "rgba(0, 100, 200, 0.5)";
             ctx.fillRect(0, waterSurfaceY, canvas.width, floorWaterHeight);
         }
 
-        // --- ひよこの物理計算🐣 ---
-        if (dragTarget !== chick) {
-            // 重力
-            chick.vy += gravity;
-            
-            // 浮力計算
-            let chickBottom = chick.y + chick.radius;
-            // 水面より下にあるか？
-            if (chickBottom > waterSurfaceY) {
-                // 水に浸かってる深さ
-                let depth = chickBottom - waterSurfaceY;
-                // 浮力 (深さに応じて強く)
-                let buoyancy = depth * 0.05; 
-                chick.vy -= buoyancy;
+        // --- ひよこの物理計算（全員分ループ）🐣 ---
+        chicks.forEach(c => {
+            if (dragTarget !== c) {
+                c.vy += gravity;
+                let cBottom = c.y + c.radius;
                 
-                // 水の抵抗 (減衰)
-                chick.vy *= 0.9;
-                chick.vx *= 0.95; // 横移動も抵抗を受ける
-            } else {
-                // 空中なら空気抵抗少し
-                chick.vx *= 0.99;
-            }
-            
-            // 床との衝突
-            if (chick.y + chick.radius > canvas.height) {
-                chick.y = canvas.height - chick.radius;
-                chick.vy *= -0.3; // 少し跳ねる
-            }
-            
-            // 壁との衝突
-            if (chick.x < chick.radius) { chick.x = chick.radius; chick.vx *= -0.5; }
-            if (chick.x > canvas.width - chick.radius) { chick.x = canvas.width - chick.radius; chick.vx *= -0.5; }
+                // 浮力
+                if (cBottom > waterSurfaceY) {
+                    let depth = cBottom - waterSurfaceY;
+                    let buoyancy = depth * 0.05; 
+                    c.vy -= buoyancy;
+                    c.vy *= 0.9;
+                    c.vx *= 0.95; 
+                } else {
+                    c.vx *= 0.99;
+                }
+                
+                // 床衝突
+                if (c.y + c.radius > canvas.height) {
+                    c.y = canvas.height - c.radius;
+                    c.vy *= -0.3; 
+                }
+                // 壁衝突
+                if (c.x < c.radius) { c.x = c.radius; c.vx *= -0.5; }
+                if (c.x > canvas.width - c.radius) { c.x = canvas.width - c.radius; c.vx *= -0.5; }
 
-            // 位置更新
-            chick.x += chick.vx;
-            chick.y += chick.vy;
-        }
+                c.x += c.vx;
+                c.y += c.vy;
+            }
+        });
 
         let amountVal = parseInt(amountSlider.value); let powerVal = parseInt(powerSlider.value);
 
-        // --- 1. 水の生成 ---
         if (Math.random() * 50 < amountVal * 2) { 
             let tipX = source.x + Math.cos(source.angle) * source.width;
             let tipY = source.y + Math.sin(source.angle) * source.width;
@@ -395,7 +418,6 @@ html_code = """
             particles.push({ x: tipX, y: tipY + (Math.random()*6-3), vx: velX, vy: velY, radius: 2 + Math.random() * 3, state: 'falling' });
         }
 
-        // --- 2. 竹の物理 ---
         let k = 0.02; let force = (bamboo.targetAngle - bamboo.angle) * k;
         let waterForce = bamboo.waterMass * 0.0003; 
         bamboo.velocity += force + waterForce; bamboo.velocity *= 0.98; bamboo.angle += bamboo.velocity;
@@ -406,7 +428,6 @@ html_code = """
         }
         if (bamboo.angle < bamboo.targetAngle) { bamboo.angle = bamboo.targetAngle; bamboo.velocity = 0; bamboo.isDumping = false; }
 
-        // --- 3. 粒子更新 ---
         let pivotX = bamboo.pivotX; let pivotY = bamboo.y;
         bamboo.waterMass = 0; 
         
@@ -421,7 +442,6 @@ html_code = """
                     let localX = rx * Math.cos(-bamboo.angle) - ry * Math.sin(-bamboo.angle);
                     let localY = rx * Math.sin(-bamboo.angle) + ry * Math.cos(-bamboo.angle);
                     let tipStart = bamboo.width * 0.7; 
-                    // ファンネル無し判定
                     let inBodyX = (localX > tipStart - 10 && localX < tipStart + 20);
                     let inBodyY = (localY > -25 && localY < 25); 
                     if (inBodyX && inBodyY && p.vy > 0) { p.state = 'trapped'; p.vx = 0; p.vy = 0; }
@@ -436,15 +456,17 @@ html_code = """
                     }
                 }
                 
-                // ひよことの衝突（おまけ：ひよこに水が当たるとちょっと押される）
-                let dx = p.x - chick.x;
-                let dy = p.y - chick.y;
-                if (Math.sqrt(dx*dx + dy*dy) < chick.radius + p.radius) {
-                    if (dragTarget !== chick) {
-                        chick.vx += p.vx * 0.1; // 水流で押される
-                        chick.vy += p.vy * 0.1;
+                // 全ひよことの衝突判定
+                chicks.forEach(c => {
+                    let dx = p.x - c.x;
+                    let dy = p.y - c.y;
+                    if (Math.sqrt(dx*dx + dy*dy) < c.radius + p.radius) {
+                        if (dragTarget !== c) {
+                            c.vx += p.vx * 0.05; // 衝撃分散
+                            c.vy += p.vy * 0.05;
+                        }
                     }
-                }
+                });
 
                 if (p.y > canvas.height) { 
                     floorWaterHeight = Math.min(floorWaterHeight + 0.2, 500); 
@@ -495,7 +517,10 @@ html_code = """
 
         ctx.fillStyle = "#3e2723"; ctx.fillRect(bamboo.pivotX - 5, bamboo.y + 10, 10, 600);
         drawBasin(); 
-        drawChick(); // ★ひよこを描画（水の後、最前面）
+        
+        // 全ひよこ描画
+        chicks.forEach(c => drawOneChick(c));
+
         drawBambooRect(bamboo, false); 
         drawBambooRect(source, true);
         requestAnimationFrame(update);
