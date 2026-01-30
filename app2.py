@@ -36,9 +36,8 @@ def set_bg_url(url):
         unsafe_allow_html=True
     )
 
-# ここに画像のURLを入れる（とりあえず和風なフリー素材URL）
-# 生成した画像を使いたい場合は、その画像のURLに書き換えてね！
-set_bg_url("https://www.beiz.jp/images_P/japanese-pattern/31118.jpg") 
+
+set_bg_url("https://raw.githubusercontent.com/nekokaitaidesu-cpu/shishiodoshi/main/image1.jpg")
 
 # スタイル定義（背景以外）
 st.markdown("""
