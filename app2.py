@@ -40,6 +40,7 @@ st.markdown("""
         border-bottom: 2px solid #6b8e23;
         padding-bottom: 10px;
         color: #2e3b1f;
+        margin-top: 100px; /* 固定ヘッダーの分だけ下げる */
     }
     /* iframeの余白調整 */
     .stHtml { margin: 0 auto; }
