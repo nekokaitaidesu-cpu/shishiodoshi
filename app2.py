@@ -25,14 +25,15 @@ st.markdown("""
         border-bottom: 2px solid #6b8e23;
         padding-bottom: 10px;
         color: #2e3b1f;
+        margin-top: 60px; /* スライダーとかぶらないように余白 */
     }
     iframe { border: none; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 無限カオスししおどし (スマホ最適化Ver) 🎋")
-st.write("受け口を**上向きに開いた形**に変更！")
-st.write("スマホでも「カッコォォン！！」が**折り返してド迫力表示**されるよ！🍄")
+st.title("🎋 無限カオスししおどし (修正完了Ver) 🎋")
+st.write("カコーンのキレを戻して、スライダーを上に固定！")
+st.write("受け口の形もリクエスト通りに整形したっち🍄")
 
 # シミュレーター本体（HTML/JS）
 html_code = """
@@ -52,21 +53,22 @@ html_code = """
     }
     canvas:active { cursor: grabbing; }
     
+    /* --- コントロールパネルを「上」に固定 --- */
     .controls {
         position: fixed;
-        bottom: 10px;
+        top: 10px; /* 上部に固定 */
         left: 50%;
         transform: translateX(-50%);
-        padding: 10px 20px;
+        padding: 8px 20px;
         background: rgba(255,255,255,0.9);
         border-radius: 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         display: flex;
-        gap: 20px;
+        gap: 15px;
         z-index: 100;
         width: 90%;
         max-width: 400px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap; /* 1行に収める */
     }
     .control-group {
         display: flex;
@@ -76,14 +78,14 @@ html_code = """
     label { font-size: 0.8rem; font-weight: bold; color: #556b2f; margin-right: 5px; white-space: nowrap; }
     input[type=range] { flex-grow: 1; cursor: pointer; }
 
-    /* --- カコーン！テキストのスタイル修正 --- */
+    /* --- カコーン！テキスト（シュールVerに戻す） --- */
     #sound-text {
         position: absolute;
         top: 50%;
         left: 50%;
-        transform: translate(-50%, -50%); /* 画面中央に固定 */
+        transform: translate(-50%, -50%);
         
-        font-size: 4rem; /* サイズはそのままデカく！ */
+        font-size: 4rem; 
         font-weight: 900;
         color: #8b4513;
         opacity: 0;
@@ -91,14 +93,14 @@ html_code = """
         font-family: serif;
         text-shadow: 3px 3px 0px #fff, -1px -1px 0 #fff;
         
-        /* ★スマホ対応：折り返し設定 */
-        white-space: normal; /* 折り返しを許可 */
-        word-break: break-all; /* 単語の途中でも強制的に折り返す */
-        text-align: center; /* 中央揃え */
-        width: 90%; /* 画面幅いっぱいまで使う */
+        white-space: normal;
+        word-break: break-all;
+        text-align: center;
+        width: 90%;
         
         z-index: 50;
-        transition: opacity 0.1s, transform 1s; /* アニメーション調整 */
+        /* アニメーション削除：パッと出てパッと消える */
+        transition: opacity 0.1s; 
     }
 </style>
 </head>
@@ -149,7 +151,7 @@ html_code = """
         waterMass: 0,
         isDumping: false,
         name: 'bamboo',
-        funnelSize: 70 // 少し大きくした
+        funnelSize: 70
     };
     bamboo.pivotX = bamboo.x - bamboo.width * 0.3;
 
@@ -212,15 +214,14 @@ html_code = """
             ctx.beginPath(); ctx.arc(0, 0, obj.handleRadius, 0, Math.PI*2);
             ctx.fillStyle = "#ff6b6b"; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke();
         } else {
-            // --- 下の竹（改造Ver 3.0）---
+            // --- 下の竹（改造Ver 4.0）---
             
-            // ★1. 受け口の形状変更（上向きに開く）
+            // ★4. 受け口の形状変更（主さんの赤ペン修正版）
+            // 下のラインは真っ直ぐ、上のラインだけが開く
             ctx.beginPath();
             ctx.moveTo(relX + w, relY); // 竹の右上
-            // 斜め上へ広がる頂点 (Yをマイナスに)
-            ctx.lineTo(relX + w + obj.funnelSize, relY - 25); 
-            // 下側は竹の延長線上 (Yはそのまま)
-            ctx.lineTo(relX + w + obj.funnelSize, relY + h); 
+            ctx.lineTo(relX + w + obj.funnelSize, relY - 30); // 上に大きく開く
+            ctx.lineTo(relX + w + obj.funnelSize, relY + h);  // 下は竹の太さのまま延長
             ctx.lineTo(relX + w, relY + h); // 竹の右下
             ctx.closePath();
             
@@ -265,11 +266,16 @@ html_code = """
         }
         if (bamboo.angle < bamboo.targetAngle) { bamboo.angle = bamboo.targetAngle; bamboo.velocity = 0; bamboo.isDumping = false; }
 
-        // --- 3. 当たり判定 ---
+        // --- 3. 当たり判定 & 排出処理 ---
         let pivotX = bamboo.pivotX; let pivotY = bamboo.y;
         bamboo.waterMass = 0; 
+        
+        // ★2. 水の排出ロジック調整（バラけさせる）
+        // ランダムなオフセット用の種
+        
         for (let i = particles.length - 1; i >= 0; i--) {
             let p = particles[i];
+            
             if (p.state === 'falling') {
                 p.vy += gravity; p.x += p.vx; p.y += p.vy;
                 let rx = p.x - pivotX; let ry = p.y - pivotY;
@@ -279,50 +285,57 @@ html_code = """
                 let tipStart = bamboo.width * 0.7; 
                 let funnelEnd = tipStart + bamboo.funnelSize + 10;
                 
-                // ★判定エリア調整：上向きに開いたので、Yの許容範囲を上にずらす
                 let inFunnelX = (localX > tipStart && localX < funnelEnd);
-                // 下は狭く(-20)、上は広く(80)して、上からの水を受けやすく
                 let inFunnelY = (localY > -80 && localY < 20); 
                 
-                let trapped = false;
-                if (inFunnelX && inFunnelY) trapped = true;
-
-                if (trapped && p.vy > 0) { p.state = 'trapped'; p.vx = 0; p.vy = 0; }
+                if (inFunnelX && inFunnelY && p.vy > 0) { p.state = 'trapped'; p.vx = 0; p.vy = 0; }
                 if (p.y > canvas.height) { particles.splice(i, 1); continue; }
             }
             else if (p.state === 'trapped') {
                 bamboo.waterMass += p.radius * 3;
+                
+                // 竹が傾いたら排出
                 if (bamboo.angle > 0.4) {
-                    p.state = 'dumped'; p.vx = Math.cos(bamboo.angle) * 5; p.vy = Math.sin(bamboo.angle) * 5;
-                    p.x = bamboo.pivotX + Math.cos(bamboo.angle) * (bamboo.width*0.9);
-                    p.y = bamboo.y + Math.sin(bamboo.angle) * (bamboo.width*0.9);
+                    p.state = 'dumped';
+                    // 勢いを少しランダムにして「流れ」を作る
+                    let randomSpeed = 3 + Math.random() * 4; 
+                    p.vx = Math.cos(bamboo.angle) * randomSpeed; 
+                    p.vy = Math.sin(bamboo.angle) * randomSpeed;
+                    
+                    // 位置も少しバラつかせる（一箇所からビームみたいに出ないように）
+                    let offset = (Math.random() - 0.5) * 20;
+                    p.x = bamboo.pivotX + Math.cos(bamboo.angle) * (bamboo.width*0.9) + offset;
+                    p.y = bamboo.y + Math.sin(bamboo.angle) * (bamboo.width*0.9) + offset;
                 }
             }
             else if (p.state === 'dumped') {
                 p.vy += gravity; p.x += p.vx; p.y += p.vy;
                 if (p.y > canvas.height) { particles.splice(i, 1); continue; }
             }
-            if (p.state !== 'trapped') { ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = "rgba(100, 200, 255, 0.9)"; ctx.fill(); }
+            
+            // 描画
+            if (p.state !== 'trapped') { 
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); 
+                ctx.fillStyle = "rgba(100, 200, 255, 0.9)"; ctx.fill(); 
+            }
         }
 
         // --- 4. 描画 ---
         ctx.fillStyle = "#3e2723"; ctx.fillRect(bamboo.pivotX - 5, bamboo.y + 10, 10, 400);
         drawBambooRect(bamboo, false); drawBambooRect(source, true);
-        
-        // ★竹への追従はオフにする（CSSで中央固定）
-        // if(soundText.style.opacity > 0) { ... } 
 
         requestAnimationFrame(update);
     }
 
+    // ★1. カコーン！をシンプルに
     function showSoundText() {
         soundText.style.opacity = 1;
-        // アニメーションも少し派手に
-        soundText.style.transform = "translate(-50%, -50%) scale(1.2) rotate(-5deg)";
+        // 回転や拡大などの派手なtransformを削除
+        soundText.style.transform = "translate(-50%, -50%)"; 
+        
         setTimeout(() => {
             soundText.style.opacity = 0;
-            soundText.style.transform = "translate(-50%, -50%) scale(1.0) rotate(0deg)";
-        }, 1200);
+        }, 800); // 消えるまでの時間
     }
 
     update();
