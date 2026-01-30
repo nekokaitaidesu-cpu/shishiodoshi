@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import base64
 
 # ページ設定
 st.set_page_config(
@@ -8,18 +9,45 @@ st.set_page_config(
     layout="wide"
 )
 
-# スタイル定義
+# ★背景画像の設定関数
+def set_bg_url(url):
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("{url}");
+            background-attachment: fixed;
+            background-size: cover;
+            background-position: center;
+        }}
+        /* 文字が見えやすいように少し白を重ねる */
+        .stApp::before {{
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.6); /* 白の透過 */
+            z-index: -1;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ここに画像のURLを入れる（とりあえず和風なフリー素材URL）
+# 生成した画像を使いたい場合は、その画像のURLに書き換えてね！
+set_bg_url("https://www.beiz.jp/images_P/japanese-pattern/31118.jpg") 
+
+# スタイル定義（背景以外）
 st.markdown("""
     <style>
     body {
-        background-color: #f4f1ea;
         color: #595857;
         font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
         margin: 0;
-    }
-    .stApp {
-        background-image: url("https://www.transparenttextures.com/patterns/rice-paper-2.png");
-        background-color: #f4f1ea;
+        background-color: transparent; /* body背景は透明に */
     }
     h1 {
         text-align: center;
@@ -27,17 +55,20 @@ st.markdown("""
         padding-bottom: 10px;
         color: #2e3b1f;
         margin-top: 100px;
+        text-shadow: 2px 2px 0px #fff; /* 文字を見やすく */
     }
     .stHtml { margin: 0 auto; }
     iframe { border: none; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 無限カオスししおどし (完結：ひよこ激突編🐣) 🎋")
-st.write("ひよこと受け石の当たり判定を修正！💥")
-st.write("回転する石に巻き込まれて**吹っ飛ぶひよこ**にご注意ください😂")
+st.title("🎋 無限カオスししおどし (背景追加Ver🌸) 🎋")
+st.write("背景がついに実装されたっち！")
+st.write("やんわりした雰囲気の中で、**仁義なきひよこバトル**を楽しんでね😂")
 
-# シミュレーター本体（HTML/JS）
+# --- 以下、シミュレーター本体（前回と同じ） ---
+# （変更なしですが、念のためフルコード載せますか？今回は上のCSS部分だけの変更でOKだよ！）
+
 html_code = """
 <!DOCTYPE html>
 <html>
@@ -47,17 +78,17 @@ html_code = """
     body { 
         margin: 0; 
         font-family: sans-serif; 
-        background-color: transparent;
+        background-color: transparent; /* 背景透明 */
         overflow-y: auto; 
         height: auto;
     }
     canvas {
-        background-color: transparent;
+        background-color: transparent; /* キャンバスも透明 */
         display: block;
         margin: 0 auto;
         cursor: grab;
         touch-action: none;
-        border: 2px dashed rgba(107, 142, 35, 0.3);
+        border: 2px dashed rgba(107, 142, 35, 0.5); /* 枠線を少し濃く */
     }
     canvas:active { cursor: grabbing; }
     
@@ -68,7 +99,8 @@ html_code = """
         width: 100%;
         box-sizing: border-box;
         padding: 10px 15px;
-        background: rgba(255,255,255,0.95);
+        background: rgba(255,255,255,0.85); /* 半透明にして背景を透かす */
+        backdrop-filter: blur(5px); /* すりガラス効果 */
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         border-bottom: 1px solid #ccc;
         display: flex;
@@ -212,6 +244,7 @@ html_code = """
         handleRadius: 15
     };
 
+    // ★受け石
     const basin = {
         x: canvas.width / 2 + 50,
         y: 650, 
@@ -267,21 +300,18 @@ html_code = """
 
     function handleStart(e) {
         const pos = getPos(e);
-        // ひよこ
         for (let i = chicks.length - 1; i >= 0; i--) {
             let c = chicks[i];
             if (getDist(pos.x, pos.y, c.x, c.y) < c.radius * 1.5) {
                 dragTarget = c; dragOffsetX = pos.x - c.x; dragOffsetY = pos.y - c.y; return;
             }
         }
-        // 上のギミック
         if (getDist(pos.x, pos.y, source.x, source.y) < source.handleRadius + 15) { dragTarget = 'rotator'; return; }
         let srcCX = source.x + Math.cos(source.angle) * (source.width/2);
         let srcCY = source.y + Math.sin(source.angle) * (source.width/2);
         if (getDist(pos.x, pos.y, srcCX, srcCY) < 60) { dragTarget = source; dragOffsetX = pos.x - source.x; dragOffsetY = pos.y - source.y; return; }
         if (getDist(pos.x, pos.y, bamboo.pivotX, bamboo.y) < 70) { dragTarget = bamboo; dragOffsetX = pos.x - bamboo.pivotX; dragOffsetY = pos.y - bamboo.y; return; }
         
-        // 受け石判定
         if (getDist(pos.x, pos.y, basin.x, basin.y) < Math.max(basin.width, basin.height) / 1.5) {
             dragTarget = basin;
             dragOffsetX = pos.x - basin.x; dragOffsetY = pos.y - basin.y;
@@ -429,12 +459,10 @@ html_code = """
         chicks.forEach(c => applyPhysics(c));
         applyPhysics(basin); 
 
-        // --- ★受け石 vs ひよこ の衝突判定 (修正版) ---
+        // --- ★受け石 vs ひよこ ---
         chicks.forEach(c => {
             if (dragTarget === c || dragTarget === basin) return; 
 
-            // 1. ひよこを、石の中心を原点とした回転前の座標系に変換
-            // rotatePointは絶対座標を返すので、そこからbasin.x/yを引いて「相対座標」にする
             let unrotatedP = rotatePoint(basin.x, basin.y, c.x, c.y, -basin.angle);
             let localCX = unrotatedP.x - basin.x;
             let localCY = unrotatedP.y - basin.y;
@@ -442,8 +470,6 @@ html_code = """
             let halfW = basin.width / 2;
             let halfH = basin.height / 2;
 
-            // 2. 矩形（AABB）と円の衝突判定
-            // ひよこの中心に最も近い矩形上の点を見つける
             let closestX = Math.max(-halfW, Math.min(localCX, halfW));
             let closestY = Math.max(-halfH, Math.min(localCY, halfH));
 
@@ -451,50 +477,35 @@ html_code = """
             let distY = localCY - closestY;
             let distanceSquared = (distX * distX) + (distY * distY);
 
-            // 3. 衝突！
             if (distanceSquared < (c.radius * c.radius)) {
                 let distance = Math.sqrt(distanceSquared);
                 let overlap = c.radius - distance;
                 
-                // 法線（ローカル）- 矩形から外へ向かうベクトル
                 let localNx = (distance > 0) ? distX / distance : 0; 
                 let localNy = (distance > 0) ? distY / distance : 1; 
-                // もし完全に内部に入り込んだら（distance=0）、とりあえず上に押し出す
                 if (distance === 0) localNy = -1;
 
-                // 4. 法線をワールド座標へ戻す（回転させる）
-                // ベクトルなのでrotatePointのcx, cyは0
                 let worldNorm = rotatePoint(0, 0, localNx, localNy, basin.angle);
 
-                // 5. 反発処理
                 let totalMass = c.mass + basin.mass;
-                let m1 = c.mass / totalMass; // ひよこの重み比率
-                let m2 = basin.mass / totalMass; // 石の重み比率
+                let m1 = c.mass / totalMass; 
+                let m2 = basin.mass / totalMass; 
 
-                // 位置修正 (めり込み解消)
-                c.x += worldNorm.x * overlap * m2 * 1.1; // ひよこを動かす（少し多めに）
+                c.x += worldNorm.x * overlap * m2 * 1.1; 
                 c.y += worldNorm.y * overlap * m2 * 1.1;
-                basin.x -= worldNorm.x * overlap * m1; // 石も少し動く
+                basin.x -= worldNorm.x * overlap * m1; 
                 basin.y -= worldNorm.y * overlap * m1;
 
-                // 速度変化 (バウンス)
-                let restitution = 0.5;
-                
-                // 衝撃を速度に加算
-                // ひよこは吹っ飛ぶ
                 c.vx += worldNorm.x * 2; 
                 c.vy += worldNorm.y * 2;
                 
-                // 石は少し揺れる & 回転力が加わる
                 basin.vx -= worldNorm.x * 0.2;
                 basin.vy -= worldNorm.y * 0.2;
-                // トルク計算: 衝突点と重心のズレの外積的なもの
                 basin.vAngle += (localCX * localNy - localCY * localNx) * 0.005;
             }
         });
 
-
-        // ひよこ衝突（仲間割れ）
+        // ひよこ衝突
         let collisionEnabled = collisionToggle.checked;
         if (collisionEnabled) {
              for (let i = 0; i < chicks.length; i++) { for (let j = i + 1; j < chicks.length; j++) { let c1 = chicks[i]; let c2 = chicks[j]; let dx = c2.x - c1.x; let dy = c2.y - c1.y; let dist = Math.sqrt(dx * dx + dy * dy); let minDist = c1.radius + c2.radius; if (dist < minDist) { let angle = Math.atan2(dy, dx); let overlap = minDist - dist; let moveX = Math.cos(angle) * overlap * 0.5; let moveY = Math.sin(angle) * overlap * 0.5; if (dragTarget !== c1) { c1.x -= moveX; c1.y -= moveY; } if (dragTarget !== c2) { c2.x += moveX; c2.y += moveY; } let vxRel = c2.vx - c1.vx; let vyRel = c2.vy - c1.vy; let nx = dx / dist; let ny = dy / dist; let velAlongNormal = vxRel * nx + vyRel * ny; if (velAlongNormal < 0) { let restitution = 0.8; let jVal = -(1 + restitution) * velAlongNormal; jVal /= 2; let impulseX = jVal * nx; let impulseY = jVal * ny; if (dragTarget !== c1) { c1.vx -= impulseX; c1.vy -= impulseY; } if (dragTarget !== c2) { c2.vx += impulseX; c2.vy += impulseY; } } } } }
@@ -521,7 +532,7 @@ html_code = """
                     if (inBodyX && inBodyY && p.vy > 0) { p.state = 'trapped'; p.vx = 0; p.vy = 0; }
                 }
 
-                // 受け石判定（回転考慮）
+                // 受け石判定
                 let relP = rotatePoint(basin.x, basin.y, p.x, p.y, -basin.angle);
                 let bx = basin.x - basin.width/2; let by = basin.y - basin.height/2;
                 if (relP.y > by && relP.y < by + basin.height && relP.x > bx + 10 && relP.x < bx + basin.width - 10) {
@@ -551,7 +562,6 @@ html_code = """
             if (p.state !== 'trapped') { ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = "rgba(100, 200, 255, 0.9)"; ctx.fill(); }
         }
         
-        // 溢れ演出
         if (basin.waterLevel >= basin.maxLevel || Math.abs(basin.angle) > 0.5) {
             if (basin.waterLevel > 0 && Math.random() < 0.3) { 
                 basin.waterLevel -= 0.5; 
