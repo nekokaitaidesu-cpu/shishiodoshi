@@ -197,9 +197,11 @@ html_code = """
 
     const gravity = 0.15;
 
-    // --- オブジェクト ---
+    // --- オブジェクト設定（位置調整版） ---
+    
     const bamboo = {
-        x: canvas.width / 2 + 20, 
+        // ① 下の竹：少し左にずらす (canvas.width / 2 + 20  ->  canvas.width / 2 - 40)
+        x: canvas.width / 2 - 40, 
         y: 350, 
         width: 180,
         height: 36,
@@ -212,14 +214,16 @@ html_code = """
         isDumping: false,
         name: 'bamboo',
     };
+    // 支点の位置も再計算
     bamboo.pivotX = bamboo.x - bamboo.width * 0.3;
 
     const source = {
-        x: canvas.width / 2 - 80,
+        // ② 上の竹：右側に配置して、左に向ける
+        x: canvas.width / 2 + 100, // 右側に移動 (元 -80)
         y: 150, 
         width: 120,
         height: 24,
-        angle: 0.2, 
+        angle: 2.9, // 左向き（約166度）
         name: 'source',
         handleRadius: 15
     };
@@ -434,12 +438,10 @@ html_code = """
                 obj.x += obj.vx;
                 obj.y += obj.vy;
                 
-                // 回転 (スイッチONの時のみ)
                 if (obj.vAngle !== undefined) {
                     if (collisionEnabled) {
                         obj.angle += obj.vAngle;
                     } else {
-                        // OFFなら水平に戻ろうとする
                         obj.angle *= 0.9; 
                         obj.vAngle = 0;
                     }
@@ -450,7 +452,7 @@ html_code = """
         chicks.forEach(c => applyPhysics(c));
         applyPhysics(basin); 
 
-        // --- ★受け石 vs ひよこ の衝突判定 (スイッチONのみ) ---
+        // --- ★受け石 vs ひよこ の衝突判定 ---
         if (collisionEnabled) {
             chicks.forEach(c => {
                 if (dragTarget === c || dragTarget === basin) return; 
@@ -497,7 +499,7 @@ html_code = """
             });
         }
 
-        // ひよこ衝突（仲間割れ）
+        // ひよこ衝突
         if (collisionEnabled) {
              for (let i = 0; i < chicks.length; i++) { for (let j = i + 1; j < chicks.length; j++) { let c1 = chicks[i]; let c2 = chicks[j]; let dx = c2.x - c1.x; let dy = c2.y - c1.y; let dist = Math.sqrt(dx * dx + dy * dy); let minDist = c1.radius + c2.radius; if (dist < minDist) { let angle = Math.atan2(dy, dx); let overlap = minDist - dist; let moveX = Math.cos(angle) * overlap * 0.5; let moveY = Math.sin(angle) * overlap * 0.5; if (dragTarget !== c1) { c1.x -= moveX; c1.y -= moveY; } if (dragTarget !== c2) { c2.x += moveX; c2.y += moveY; } let vxRel = c2.vx - c1.vx; let vyRel = c2.vy - c1.vy; let nx = dx / dist; let ny = dy / dist; let velAlongNormal = vxRel * nx + vyRel * ny; if (velAlongNormal < 0) { let restitution = 0.8; let jVal = -(1 + restitution) * velAlongNormal; jVal /= 2; let impulseX = jVal * nx; let impulseY = jVal * ny; if (dragTarget !== c1) { c1.vx -= impulseX; c1.vy -= impulseY; } if (dragTarget !== c2) { c2.vx += impulseX; c2.vy += impulseY; } } } } }
         }
@@ -523,14 +525,14 @@ html_code = """
                     if (inBodyX && inBodyY && p.vy > 0) { p.state = 'trapped'; p.vx = 0; p.vy = 0; }
                 }
 
-                // 受け石判定（回転考慮）
+                // 受け石判定
                 let relP = rotatePoint(basin.x, basin.y, p.x, p.y, -basin.angle);
                 let bx = basin.x - basin.width/2; let by = basin.y - basin.height/2;
                 if (relP.y > by && relP.y < by + basin.height && relP.x > bx + 10 && relP.x < bx + basin.width - 10) {
                     if (p.vy > 0 && relP.y < by + 30) { 
                          if (basin.waterLevel < basin.maxLevel && Math.abs(basin.angle) < 0.5) { basin.waterLevel += 0.5; particles.splice(i, 1); continue; } else { p.state = 'overflow'; }
                     } else if (p.vy < 0 && relP.y > by + basin.height - 30) { 
-                        if (dragTarget !== basin && collisionEnabled) { // ★スイッチON時のみ回転力
+                        if (dragTarget !== basin && collisionEnabled) { 
                             let torque = (relP.x - basin.x) * p.vy * 0.001; basin.vAngle += torque; basin.vy += p.vy * 0.05; 
                         }
                     }
