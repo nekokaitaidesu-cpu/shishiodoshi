@@ -3,9 +3,9 @@ import streamlit.components.v1 as components
 
 # ページ設定
 st.set_page_config(
-    page_title="和風ししおどしシミュレーター",
+    page_title="無限カオスししおどし",
     page_icon="🎋",
-    layout="centered"
+    layout="wide" # 横幅も広く使えるように
 )
 
 # スタイル定義
@@ -26,19 +26,21 @@ st.markdown("""
         padding-bottom: 10px;
         color: #2e3b1f;
     }
+    /* iframeの枠を消す */
+    iframe { border: none; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎋 カオス・ししおどし (改造Ver) 🎋")
-st.write("受け口を**ガバッと**広げて、動きを**ドッシリ**重くしたっち！🍄")
-st.write("下のスライダーで「水量」と「勢い」をMAXにして遊んでみて😂")
+st.title("🎋 無限カオスししおどし (縦長Ver) 🎋")
+st.write("受け口を**△**にして、判定バグを修正！")
+st.write("さらに画面を**縦にどーんと伸ばした**から、スマホでも広々置けるよ！🍄")
 
 # シミュレーター本体（HTML/JS）
-# スライダーをHTML内に埋め込んで、リロードなしでグリグリ調整できるようにしたよ！
 html_code = """
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
     canvas {
@@ -46,38 +48,39 @@ html_code = """
         display: block;
         margin: 0 auto;
         cursor: grab;
-        touch-action: none;
+        touch-action: none; /* スクロールはCanvas外でやってもらう */
+        border: 2px dashed rgba(107, 142, 35, 0.3); /* エリアが見えるように薄い枠 */
     }
     canvas:active { cursor: grabbing; }
-    .container {
-        position: relative;
-        width: 100%;
-        text-align: center;
-        user-select: none;
-    }
-    /* スライダー群のスタイル */
+    
+    /* コントロールパネルを固定配置に変更 */
     .controls {
-        margin-top: 10px;
-        padding: 10px;
-        background: rgba(255,255,255,0.6);
-        border-radius: 10px;
-        display: inline-block;
+        position: fixed;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px 20px;
+        background: rgba(255,255,255,0.9);
+        border-radius: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        display: flex;
+        gap: 20px;
+        z-index: 100;
+        width: 90%;
+        max-width: 400px;
+        flex-wrap: wrap;
     }
     .control-group {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        margin: 5px 0;
-        width: 300px;
+        flex-grow: 1;
     }
-    label { font-weight: bold; color: #556b2f; margin-right: 10px; }
+    label { font-size: 0.8rem; font-weight: bold; color: #556b2f; margin-right: 5px; white-space: nowrap; }
     input[type=range] { flex-grow: 1; cursor: pointer; }
-    
+
     #sound-text {
         position: absolute;
-        top: 40%;
-        left: 50%;
-        transform: translate(-50%, -50%);
+        /* 文字の位置はJSで制御 */
         font-size: 4rem;
         font-weight: 900;
         color: #8b4513;
@@ -86,22 +89,23 @@ html_code = """
         font-family: serif;
         text-shadow: 3px 3px 0px #fff, -1px -1px 0 #fff;
         white-space: nowrap;
+        z-index: 50;
     }
 </style>
 </head>
 <body>
 
 <div class="container">
-    <canvas id="simCanvas" width="600" height="500"></canvas>
+    <canvas id="simCanvas"></canvas>
     <div id="sound-text">カッコォォン！！</div>
     
     <div class="controls">
         <div class="control-group">
-            <label>💧 水量 (Amount)</label>
+            <label>💧水量</label>
             <input type="range" id="amountSlider" min="1" max="50" value="5">
         </div>
         <div class="control-group">
-            <label>🚀 勢い (Power)</label>
+            <label>🚀勢い</label>
             <input type="range" id="powerSlider" min="1" max="30" value="5">
         </div>
     </div>
@@ -114,34 +118,37 @@ html_code = """
     const amountSlider = document.getElementById('amountSlider');
     const powerSlider = document.getElementById('powerSlider');
 
-    const CW = canvas.width;
-    const CH = canvas.height;
+    // 画面サイズに合わせてキャンバス幅を設定
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = 1200; // ★縦長設定！
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
     const gravity = 0.15;
 
     // --- パラメータ ---
-    // 下の竹（ししおどし・重厚長大Ver）
     const bamboo = {
-        x: CW / 2 + 20, 
-        y: CH / 2 + 50,
+        x: canvas.width / 2 + 20, 
+        y: 400, // 少し上に配置
         width: 180,
         height: 36,
         angle: -0.3,
         targetAngle: -0.3,
         pivotX: 0, 
         velocity: 0,
-        mass: 300, // 質量マシマシ
+        mass: 300, 
         waterMass: 0,
         isDumping: false,
         name: 'bamboo',
-        // 受け口の拡張部分
-        funnelSize: 50 
+        funnelSize: 60 
     };
     bamboo.pivotX = bamboo.x - bamboo.width * 0.3;
 
-    // 上の竹（水源）
     const source = {
-        x: CW / 2 - 80,
-        y: CH / 2 - 120,
+        x: canvas.width / 2 - 80,
+        y: 200,
         width: 120,
         height: 24,
         angle: 0.2, 
@@ -172,7 +179,8 @@ html_code = """
 
     function handleStart(e) {
         const pos = getPos(e);
-        if (getDist(pos.x, pos.y, source.x, source.y) < source.handleRadius + 10) {
+        // 上の竹
+        if (getDist(pos.x, pos.y, source.x, source.y) < source.handleRadius + 15) {
             dragTarget = 'rotator'; return;
         }
         let srcCX = source.x + Math.cos(source.angle) * (source.width/2);
@@ -181,15 +189,18 @@ html_code = """
             dragTarget = source;
             dragOffsetX = pos.x - source.x; dragOffsetY = pos.y - source.y; return;
         }
+        // 下の竹
         if (getDist(pos.x, pos.y, bamboo.pivotX, bamboo.y) < 70) {
             dragTarget = bamboo;
             dragOffsetX = pos.x - bamboo.pivotX; dragOffsetY = pos.y - bamboo.y; return;
         }
     }
+    
     function handleMove(e) {
         if (!dragTarget) return;
-        e.preventDefault();
+        e.preventDefault(); // キャンバス内の操作中はスクロール防止
         const pos = getPos(e);
+        
         if (dragTarget === 'rotator') {
             let dx = pos.x - source.x; let dy = pos.y - source.y;
             source.angle = Math.atan2(dy, dx);
@@ -235,52 +246,39 @@ html_code = """
             ctx.fillStyle = "#ff6b6b"; ctx.fill(); 
             ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke();
         } else {
-            // 下の竹（改造Ver）
+            // --- 下の竹（改造Ver 2.0）---
             
-            // ★1. 受け口拡張ファンネル（じょうご）のパス定義
-            // 竹の先端(relX + w)からさらに外側に広がる台形
-            let funnelLen = obj.funnelSize;
-            let funnelTopW = 20; // 上への広がり
-            let funnelBotW = 10; // 下への広がり（控えめ）
-
-            // ファンネルの描画パス
+            // ★2. 受け口を「三角形」に変更
             ctx.beginPath();
             ctx.moveTo(relX + w, relY); // 竹の上端
-            ctx.lineTo(relX + w + funnelLen, relY - funnelTopW); // 広がった先(上)
-            ctx.lineTo(relX + w + funnelLen, relY + h + funnelBotW); // 広がった先(下)
+            ctx.lineTo(relX + w + obj.funnelSize, relY - 10); // 三角の頂点（外側・上）
+            // 三角形の形にするため、下側も同じ頂点に向かうか、あるいは底辺を広くするか
+            // 主さんの絵のイメージ：竹の断面全体から広がってキャッチする感じ
             ctx.lineTo(relX + w, relY + h); // 竹の下端
             ctx.closePath();
             
-            // ファンネル着色 (半透明緑)
+            // ファンネル着色
             ctx.fillStyle = "rgba(50, 205, 50, 0.4)"; 
             ctx.fill();
             ctx.strokeStyle = "#32cd32";
             ctx.stroke();
 
-            // 水の描画（竹本体 + ファンネル内）
+            // 水の描画
             ctx.save();
             ctx.beginPath();
-            ctx.rect(relX, relY, w, h); // 竹本体
-            // ファンネル部分も水が入るようにクリップ領域に追加してもいいけど
-            // 簡易的に竹本体のみに水が溜まる表現にする（その方が満タン感が出る）
+            ctx.rect(relX, relY, w, h); 
             ctx.clip();
             
-            // 水位（ゆっくり溜まる演出のため、溜まった量に応じて高さを変える）
-            // massが大きいので、hいっぱいになるには相当溜まる必要がある
-            let fillRate = Math.min(obj.waterMass / 250, 1.0); // 250溜まると満タン
+            let fillRate = Math.min(obj.waterMass / 250, 1.0);
             let waterLevel = fillRate * h;
             
             if (waterLevel > 0) {
                 ctx.fillStyle = "rgba(100, 200, 255, 0.85)";
                 ctx.fillRect(relX, relY + h - waterLevel, w, waterLevel);
-                // 水面揺れ
-                ctx.strokeStyle = "rgba(255,255,255,0.8)";
-                ctx.beginPath(); ctx.moveTo(relX, relY + h - waterLevel);
-                ctx.lineTo(relX + w, relY + h - waterLevel); ctx.stroke();
             }
             ctx.restore();
 
-            // 竹本体（クリア）
+            // 竹本体
             ctx.fillStyle = "rgba(144, 238, 144, 0.2)";
             ctx.fillRect(relX, relY, w, h);
             ctx.strokeStyle = "#556b2f"; ctx.lineWidth = 3;
@@ -290,19 +288,15 @@ html_code = """
     }
 
     function update() {
-        ctx.clearRect(0, 0, CW, CH);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // パラメータ取得
         let amountVal = parseInt(amountSlider.value);
         let powerVal = parseInt(powerSlider.value);
 
         // --- 1. 水の生成 ---
-        // amountValが高いほど確率UP & 一度に出る量UP
         if (Math.random() * 50 < amountVal * 2) { 
             let tipX = source.x + Math.cos(source.angle) * source.width;
             let tipY = source.y + Math.sin(source.angle) * source.width;
-            
-            // 勢い (powerVal)
             let speed = (powerVal * 0.5) + Math.random(); 
             let velX = Math.cos(source.angle) * speed;
             let velY = Math.sin(source.angle) * speed;
@@ -315,45 +309,32 @@ html_code = """
             });
         }
 
-        // --- 2. 竹の物理計算 (重量級チューニング) ---
-        // 復元力（バネ）を弱く、反応を遅く
-        let k = 0.02; // バネ定数 (前の1/4くらい)
+        // --- 2. 竹の物理計算 ---
+        let k = 0.02; 
         let force = (bamboo.targetAngle - bamboo.angle) * k;
-        
-        // 水の重み係数も小さくして「たくさん溜めないと動かない」ようにする
         let waterForce = bamboo.waterMass * 0.0003; 
         
         bamboo.velocity += force + waterForce;
-        bamboo.velocity *= 0.98; // 減衰少なめ（慣性で動く感じ）
+        bamboo.velocity *= 0.98; 
         bamboo.angle += bamboo.velocity;
 
-        // 下限（カコーン）
         if (bamboo.angle > 0.8) {
             bamboo.angle = 0.8;
-            bamboo.velocity *= -0.2; // 跳ね返り小さく（重いから）
-            
-            // ある程度溜まってたら音（文字）出す
+            bamboo.velocity *= -0.2; 
             if (!bamboo.isDumping && bamboo.waterMass > 150) {
                  showSoundText();
             }
             bamboo.isDumping = true;
         }
-        // 上限（戻り位置）
         if (bamboo.angle < bamboo.targetAngle) {
             bamboo.angle = bamboo.targetAngle;
-            bamboo.velocity = 0; // ピタッと止める
+            bamboo.velocity = 0; 
             bamboo.isDumping = false;
         }
 
-        // --- 3. 当たり判定（ガバガバ拡張） ---
-        // 受け口の定義：竹の右端 + ファンネル分
-        // 単純な点と点ではなく、ライン（線分）との距離で判定してあげると入りやすい
-        // ここでは簡易的に「竹の軸線に近く、かつ先端付近にあるか」で判定
-        
+        // --- 3. 当たり判定（修正版） ---
         let bambooVecX = Math.cos(bamboo.angle);
         let bambooVecY = Math.sin(bamboo.angle);
-        
-        // 判定基準点：回転軸
         let pivotX = bamboo.pivotX;
         let pivotY = bamboo.y;
 
@@ -365,47 +346,58 @@ html_code = """
             if (p.state === 'falling') {
                 p.vy += gravity; p.x += p.vx; p.y += p.vy;
                 
-                // 竹のローカル座標系に変換して判定
+                // ローカル座標変換
                 let rx = p.x - pivotX;
                 let ry = p.y - pivotY;
-                // 回転を戻す
                 let localX = rx * Math.cos(-bamboo.angle) - ry * Math.sin(-bamboo.angle);
                 let localY = rx * Math.sin(-bamboo.angle) + ry * Math.cos(-bamboo.angle);
 
-                // 判定エリア（竹の内部 〜 ファンネルの先端まで）
-                // 竹の長さ: width, ファンネル: +funnelSize
-                // 幅: height
+                // ★判定エリアの修正
+                // 1. 竹の本体エリア
+                // 2. 三角ファンネルエリア
                 
-                // 右端(先端)付近のエリアを広くとる
-                // 竹の右端(-w*0.3 + w = w*0.7) から ファンネル先まで
-                let tipStart = bamboo.width * 0.7;
-                let tipEnd = tipStart + bamboo.funnelSize + 20; // ちょっとおまけ
+                // 竹の右端
+                let tipStart = bamboo.width * 0.7; // (-0.3 + 1.0)
+                let funnelEnd = tipStart + bamboo.funnelSize + 10;
                 
-                let inRangeX = (localX > tipStart - 20 && localX < tipEnd);
-                let inRangeY = (localY > -30 && localY < 30); // 縦幅ガバガバ(本来height/2=18)
+                // ★バグ修正：角度制限を撤廃！
+                // 単純に「ファンネルの範囲内にあり」かつ「縦位置（localY）が許容範囲」なら入る
+                
+                let inFunnelX = (localX > tipStart && localX < funnelEnd);
+                // 三角形なので、先に行くほど許容Yを広くする...といきたいけど
+                // まずは「ガバガバ」にするため、広めの長方形判定にしちゃう（吸い込み重視）
+                let inFunnelY = (localY > -50 && localY < 50); 
+                
+                // 本体に入ってるか
+                let inBodyX = (localX > 0 && localX <= tipStart);
+                let inBodyY = (localY > -15 && localY < 15);
 
-                if (inRangeX && inRangeY && p.vy > 0 && bamboo.angle < 0) {
+                // どちらかに入っていればOK
+                let trapped = false;
+                if (inFunnelX && inFunnelY) trapped = true;
+                // 本体判定は厳密にしないと、下から抜けたやつが入っちゃうので注意
+                // 今回はファンネルメインで吸う
+
+                if (trapped && p.vy > 0) { // ★角度チェック(bamboo.angle < 0)を削除！
                      p.state = 'trapped';
                      p.vx = 0; p.vy = 0;
                 }
                 
-                if (p.y > CH) { particles.splice(i, 1); continue; }
+                if (p.y > canvas.height) { particles.splice(i, 1); continue; }
             }
             else if (p.state === 'trapped') {
                 bamboo.waterMass += p.radius * 3;
-                // 排出
                 if (bamboo.angle > 0.4) {
                     p.state = 'dumped';
-                    p.vx = Math.cos(bamboo.angle) * 5; // 勢いよく
+                    p.vx = Math.cos(bamboo.angle) * 5; 
                     p.vy = Math.sin(bamboo.angle) * 5;
-                    // 先端から飛ばす
                     p.x = bamboo.pivotX + Math.cos(bamboo.angle) * (bamboo.width*0.9);
                     p.y = bamboo.y + Math.sin(bamboo.angle) * (bamboo.width*0.9);
                 }
             }
             else if (p.state === 'dumped') {
                 p.vy += gravity; p.x += p.vx; p.y += p.vy;
-                if (p.y > CH) { particles.splice(i, 1); continue; }
+                if (p.y > canvas.height) { particles.splice(i, 1); continue; }
             }
             
             if (p.state !== 'trapped') {
@@ -417,21 +409,27 @@ html_code = """
         // --- 4. 描画 ---
         // 支柱
         ctx.fillStyle = "#3e2723";
-        ctx.fillRect(bamboo.pivotX - 5, bamboo.y + 10, 10, 200);
+        ctx.fillRect(bamboo.pivotX - 5, bamboo.y + 10, 10, 400); // 支柱も長く
 
         drawBambooRect(bamboo, false);
         drawBambooRect(source, true);
         
+        // カコーンテキストの位置を竹に追従させる
+        if(soundText.style.opacity > 0) {
+             soundText.style.left = (bamboo.x + 100) + 'px';
+             soundText.style.top = (bamboo.y - 50) + 'px';
+        }
+
         requestAnimationFrame(update);
     }
 
     function showSoundText() {
         soundText.style.opacity = 1;
-        soundText.style.transform = "translate(-50%, -60%) scale(1.5)";
+        soundText.style.transform = "scale(1.5)";
         setTimeout(() => {
             soundText.style.opacity = 0;
-            soundText.style.transform = "translate(-50%, -50%) scale(1.0)";
-        }, 1000); // 表示時間も長く
+            soundText.style.transform = "scale(1.0)";
+        }, 1000);
     }
 
     update();
@@ -440,4 +438,5 @@ html_code = """
 </html>
 """
 
-components.html(html_code, height=650)
+# 高さをガツンと確保！
+components.html(html_code, height=1250)
